@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>yeti</name>
+  <version>0.0.0</version>
+  <description>The yeti package</description>
+  <maintainer email="keenan.burnett@robotics.utias.utoronto.ca">Keenan Burnett</maintainer>
+  <author>Keenan Burnett</author>
+  <license>BSD</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <export>
+    <metapackage/>
+  </export>
+</package>
