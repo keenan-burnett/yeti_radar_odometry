@@ -1,7 +1,9 @@
+project(yeti_mapping)
+cmake_minimum_required(VERSION 3.1)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -W -Wno-unused-parameter")
-cmake_minimum_required(VERSION 2.8.3)
-project(yeti_mapping)
+
+
 
 add_definitions(-DSTEAM_DEFAULT_NUM_OPENMP_THREADS=4)
 

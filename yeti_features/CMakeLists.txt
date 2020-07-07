@@ -29,9 +29,15 @@ include_directories(
 	${Boost_INCLUDE_DIRS}
 )
 
-add_library(feature_extraction src/feature_extraction.cpp)
-target_link_libraries(feature_extraction
-	${DEPEND_LIBS}
+add_library(features src/features.cpp)
+target_link_libraries(features
+	${catkin_LIBRARIES}
+	${OpenCV_LIBRARIES}
+	${Boost_INCLUDE_DIRS}
+)
+
+add_library(radar_utils src/radar_utils.cpp)
+target_link_libraries(radar_utils
 	${catkin_LIBRARIES}
 	${OpenCV_LIBRARIES}
 	${Boost_INCLUDE_DIRS}
@@ -39,7 +45,8 @@ target_link_libraries(feature_extraction
 
 add_executable(visualization src/visualization.cpp)
 target_link_libraries(visualization
-	${DEPEND_LIBS}
+    features
+    radar_utils
 	${catkin_LIBRARIES}
 	${OpenCV_LIBRARIES}
 	${Boost_INCLUDE_DIRS}
