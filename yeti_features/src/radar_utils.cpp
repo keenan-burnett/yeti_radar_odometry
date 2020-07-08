@@ -1,3 +1,4 @@
+#include <math.h>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include "radar_utils.hpp"
@@ -5,7 +6,6 @@
 void load_radar(std::string path, std::vector<int64_t> &timestamps, std::vector<float> &azimuths,
     std::vector<bool> &valid, cv::Mat &fft_data) {
     int encoder_size = 5600;
-    std::cout << path << std::endl;
     cv::Mat raw_example_data = cv::imread(path, cv::IMREAD_GRAYSCALE);
     int N = raw_example_data.rows;
     timestamps = std::vector<int64_t>(N, 0);
@@ -13,7 +13,6 @@ void load_radar(std::string path, std::vector<int64_t> &timestamps, std::vector<
     valid = std::vector<bool>(N, true);
     int range_bins = 3768;
     fft_data = cv::Mat::zeros(N, range_bins, CV_32F);
-    std::cout << N << " " << raw_example_data.cols << std::endl;
     for (int i = 0; i < N; ++i) {
         uchar* byteArray = raw_example_data.ptr<uchar>(i);
         timestamps[i] = *((int64_t *)(byteArray));
@@ -67,7 +66,7 @@ void radar_polar_to_cartesian(std::vector<float> azimuths, cv::Mat fft_data, flo
     if (interpolate_crossover) {
         cv::Mat a0 = cv::Mat::zeros(1, fft_data.cols, CV_32F);
         cv::Mat aN_1 = cv::Mat::zeros(1, fft_data.cols, CV_32F);
-        for (int j = 0; j < fft_data.cols; j++) {
+        for (int j = 0; j < fft_data.cols; ++j) {
             a0.at<float>(0, j) = fft_data.at<float>(0, j);
             aN_1.at<float>(0, j) = fft_data.at<float>(fft_data.rows-1, j);
         }
@@ -76,4 +75,29 @@ void radar_polar_to_cartesian(std::vector<float> azimuths, cv::Mat fft_data, flo
         angle = angle + 1;
     }
     cv::remap(fft_data, cart_img, range, angle, cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
+}
+
+void polar_to_cartesian_points(std::vector<float> azimuths, std ::vector<cv::Point2f> polar_points,
+    float radar_resolution, std::vector<cv::Point2f> &cart_points) {
+    cart_points = polar_points;
+    for (uint i = 0; i < polar_points.size(); ++i) {
+        float azimuth = azimuths[polar_points[i].x];
+        float r = polar_points[i].y * radar_resolution + radar_resolution / 2;
+        cart_points[i].x = r * cos(azimuth);
+        cart_points[i].y = r * sin(azimuth);
+    }
+}
+
+void convert_to_bev(std::vector<cv::Point2f> cart_points, float cart_resolution, int cart_pixel_width,
+    std::vector<cv::Point> &bev_points) {
+    float cart_min_range = (cart_pixel_width / 2) * cart_resolution;
+    if (cart_pixel_width % 2 == 0)
+        cart_min_range = (cart_pixel_width / 2 - 0.5) * cart_resolution;
+    bev_points.clear();
+    for (uint i = 0; i < cart_points.size(); ++i) {
+        int u = (cart_min_range + cart_points[i].y) / cart_resolution;
+        int v = (cart_min_range - cart_points[i].x) / cart_resolution;
+        if (0 < u && u < cart_pixel_width && 0 < v && v < cart_pixel_width)
+            bev_points.push_back(cv::Point(u, v));
+    }
 }

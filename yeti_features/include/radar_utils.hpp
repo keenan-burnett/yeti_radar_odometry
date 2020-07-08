@@ -38,3 +38,23 @@ void load_radar(std::string path, std::vector<int64_t> &timestamps, std::vector<
 */
 void radar_polar_to_cartesian(std::vector<float> azimuths, cv::Mat fft_data, float radar_resolution,
     float cart_resolution, int cart_pixel_width, bool interpolate_crossover, cv::Mat &cart_img);
+
+/*!
+   \brief "Description"
+   \param "Param description"
+   \pre "Pre-conditions"
+   \post "Post-conditions"
+   \return "Return of the function"
+*/
+void polar_to_cartesian_points(std::vector<float> azimuths, std ::vector<cv::Point2f> polar_points,
+    float radar_resolution, std::vector<cv::Point2f> &cart_points);
+
+/*!
+   \brief "Description"
+   \param "Param description"
+   \pre "Pre-conditions"
+   \post "Post-conditions"
+   \return "Return of the function"
+*/
+void convert_to_bev(std::vector<cv::Point2f> cart_points, float cart_resolution, int cart_pixel_width,
+    std::vector<cv::Point> &bev_points);

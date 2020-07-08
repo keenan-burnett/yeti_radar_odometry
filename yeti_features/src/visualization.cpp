@@ -5,7 +5,9 @@
 #include <string>
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
 #include "radar_utils.hpp"
+#include "features.hpp"
 
 inline bool exists(const std::string& name) {
     struct stat buffer;
@@ -29,10 +31,6 @@ int main() {
     // Sort files in ascending order of time stamp
     std::sort(radar_files.begin(), radar_files.end(), less_than_img());
 
-    std::cout << radar_files[0] << std::endl;
-    std::cout << radar_files[1] << std::endl;
-    std::cout << radar_files[2] << std::endl;
-
     float radar_resolution = 0.0432;
     std::vector<int64_t> timestamps;
     std::vector<float> azimuths;
@@ -48,7 +46,26 @@ int main() {
     radar_polar_to_cartesian(azimuths, fft_data, radar_resolution, cart_resolution, cart_pixel_width,
         interpolate_crossover, cart_img);
 
-    cv::imshow("cart", cart_img);
+    std::vector<cv::Point2f> targets;
+    int window_size = 128;
+    float scale = 3.5;
+    int guard_cells = 32;
+    cfar1d(fft_data, window_size, scale, guard_cells, targets);
+    std::vector<cv::Point2f> cart_targets;
+    polar_to_cartesian_points(azimuths, targets, radar_resolution, cart_targets);
+    std::vector<cv::Point> bev_points;
+    convert_to_bev(cart_targets, cart_resolution, cart_pixel_width, bev_points);
+
+    std::cout << bev_points[0] << std::endl;
+
+    cv::Mat vis;
+    cv::cvtColor(cart_img, vis, cv::COLOR_GRAY2BGR);
+    for (cv::Point p : bev_points) {
+        // cv::drawMarker(vis, p, cv::Scalar(0, 0, 255), 1, 1, 8);
+        cv::circle(vis, p, 1, cv::Scalar(0, 0, 255), -1);
+    }
+
+    cv::imshow("cart", vis);
     cv::waitKey(0);
 
     return 0;
