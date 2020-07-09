@@ -39,32 +39,35 @@ int main() {
 
     load_radar(datadir + "/" + radar_files[100], timestamps, azimuths, valid, fft_data);
 
-    // cv::imshow("radar", fft_data);
-    // cv::waitKey(0);
-
     cv::Mat cart_img;
     radar_polar_to_cartesian(azimuths, fft_data, radar_resolution, cart_resolution, cart_pixel_width,
         interpolate_crossover, cart_img);
 
     std::vector<cv::Point2f> targets;
-    int window_size = 128;
-    float scale = 3.5;
-    int guard_cells = 32;
-    cfar1d(fft_data, window_size, scale, guard_cells, targets);
+
+    // int window_size = 128;
+    // float scale = 3.5;
+    // int guard_cells = 32;
+    // cfar1d(fft_data, window_size, scale, guard_cells, targets);
+
+    float zq = 2.5;
+    int w_median = 200;
+    int sigma_gauss = 17;
+    int min_range = 58;
+    cen2018features(fft_data, zq, w_median, sigma_gauss, min_range, targets);
+
+    std::cout << "targets: " << targets.size() << std::endl;
+
     std::vector<cv::Point2f> cart_targets;
     polar_to_cartesian_points(azimuths, targets, radar_resolution, cart_targets);
     std::vector<cv::Point> bev_points;
     convert_to_bev(cart_targets, cart_resolution, cart_pixel_width, bev_points);
 
-    std::cout << bev_points[0] << std::endl;
-
     cv::Mat vis;
     cv::cvtColor(cart_img, vis, cv::COLOR_GRAY2BGR);
     for (cv::Point p : bev_points) {
-        // cv::drawMarker(vis, p, cv::Scalar(0, 0, 255), 1, 1, 8);
         cv::circle(vis, p, 1, cv::Scalar(0, 0, 255), -1);
     }
-
     cv::imshow("cart", vis);
     cv::waitKey(0);
 

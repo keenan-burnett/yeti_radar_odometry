@@ -40,21 +40,21 @@ void radar_polar_to_cartesian(std::vector<float> azimuths, cv::Mat fft_data, flo
     float cart_resolution, int cart_pixel_width, bool interpolate_crossover, cv::Mat &cart_img);
 
 /*!
-   \brief "Description"
-   \param "Param description"
-   \pre "Pre-conditions"
-   \post "Post-conditions"
-   \return "Return of the function"
+   \brief Converts points from polar coordinates to cartesian coordinates
+   \param azimuths The actual azimuth of each row in the fft data reported by the Navtech sensor
+   \param polar_points Vector of point locations (azimuth_bin, range_bin)
+   \param radar_resolution Resolution of the polar radar data (metres per pixel)
+   \param cart_points [out] Vector of points in cartesian space (x, y) in metric
 */
 void polar_to_cartesian_points(std::vector<float> azimuths, std ::vector<cv::Point2f> polar_points,
     float radar_resolution, std::vector<cv::Point2f> &cart_points);
 
 /*!
-   \brief "Description"
-   \param "Param description"
-   \pre "Pre-conditions"
-   \post "Post-conditions"
-   \return "Return of the function"
+   \brief Converts points from metric cartesian coordinates to pixel coordinates in the BEV image
+   \param cart_points Vector of points in metric cartesian space (x, y)
+   \param cart_resolution Cartesian resolution (meters per pixel)
+   \param cart_pixel_width: Width and height of the returned square cartesian output (pixels)
+   \param bev_points [out] Vector of pixel locations in the BEV cartesian image (u, v)
 */
 void convert_to_bev(std::vector<cv::Point2f> cart_points, float cart_resolution, int cart_pixel_width,
     std::vector<cv::Point> &bev_points);
