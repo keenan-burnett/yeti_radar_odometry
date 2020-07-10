@@ -67,17 +67,62 @@ void cen2018features(cv::Mat fft_data, float zq, int w_median, int sigma_gauss, 
     // Remove bias from each azimuth by calculating median power level (median filter too slow)
     cv::Mat q = cv::Mat::zeros(fft_data.rows, fft_data.cols, CV_32F);
     std::vector<float> row(fft_data.cols, 0);
+
+    float z_upper = 2.0;
+
+    std::vector<float> sigma_q(fft_data.rows, 0);
+
+    // auto t1 = std::chrono::high_resolution_clock::now();
+
+    // for (int i = 0; i < fft_data.rows; ++i) {
+    //     // Calculate mean
+    //     float mean = 0;
+    //     for (int j = 0; j < fft_data.cols; ++j) {
+    //         mean += fft_data.at<float>(i, j);
+    //     }
+    //     mean /= fft_data.cols;
+    //     float variance = 0;
+    //     for (int j = 0; j < fft_data.cols; ++j) {
+    //         variance += pow(fft_data.at<float>(i, j) - mean, 2);
+    //     }
+    //     variance /= fft_data.cols;
+    //     float sigma = sqrt(variance);
+    //     // Recalculate mean and variance using only bottom 95% of points
+    //     float mean2 = 0;
+    //     int count = 0;
+    //     float upper = z_upper * sigma;
+    //     for (int j = 0; j < fft_data.cols; ++j) {
+    //         if (fft_data.at<float>(i, j) < upper) {
+    //             mean2 += fft_data.at<float>(i, j);
+    //             count++;
+    //         }
+    //     }
+    //     mean2 /= count;
+    //     float variance2 = 0;
+    //     for (int j = 0; j < fft_data.cols; ++j) {
+    //         if (fft_data.at<float>(i, j) < upper) {
+    //             variance2 += pow(fft_data.at<float>(i, j) - mean2, 2);
+    //         }
+    //         q.at<float>(i, j) = fft_data.at<float>(i, j) - mean2;
+    //     }
+    //     variance2 /= count;
+    //     sigma_q[i] = sqrt(variance2);
+    // }
+
     for (int i = 0; i < fft_data.rows; ++i) {
         for (int j = 0; j < fft_data.cols; ++j) {
             row[j] = fft_data.at<float>(i, j);
         }
         std::sort(row.begin(), row.end());
         float median = row[row.size() / 2];
-        std::cout << median << " ";
         for (int j = 0; j < fft_data.cols; ++j) {
             q.at<float>(i, j) = fft_data.at<float>(i, j) - median;
         }
     }
+
+    // auto t2 = std::chrono::high_resolution_clock::now();
+    // std::chrono::duration<double> e = t2 - t1;
+    // std::cout << e.count() << std::endl;
 
     // Create 1D Gaussian Filter
     assert(sigma_gauss % 2 == 1);
@@ -91,19 +136,17 @@ void cen2018features(cv::Mat fft_data, float zq, int w_median, int sigma_gauss, 
         s += filter.at<float>(0, i);
     }
     filter /= s;
-    std::cout << filter << std::endl;
     cv::Mat p;
     cv::filter2D(q, p, -1, filter, cv::Point(-1, -1), 0, cv::BORDER_REFLECT101);
 
     // Estimate variance of noise at each azimuth
-    std::vector<float> sigma_q(fft_data.rows, 0);
-
+    // std::vector<float> sigma_q(fft_data.rows, 0);
     for (int i = 0; i < fft_data.rows; ++i) {
         int nonzero = 0;
         for (int j = 0; j < fft_data.cols; ++j) {
             float n = q.at<float>(i, j);
             if (n < 0) {
-                sigma_q[i] += (n * n);
+                sigma_q[i] += 2 * (n * n);
                 nonzero++;
             }
         }
@@ -113,33 +156,22 @@ void cen2018features(cv::Mat fft_data, float zq, int w_median, int sigma_gauss, 
             sigma_q[i] = 0.034;
     }
 
-
-    // float sq = 0;
-    // for (int i = 0; i < q.rows; i++) {
-    //     std::cout << zq * sigma_q[i] << " ";
-    // }
-
     cv::Mat nqp, npp, nzero;
-    norm(q - p, sigma_q, nqp);
     norm(p, sigma_q, npp);
+    norm(q - p, sigma_q, nqp);
     norm(cv::Mat::zeros(fft_data.rows, 1, CV_32F), sigma_q, nzero);
     cv::Mat ones = cv::Mat::ones(fft_data.rows, fft_data.cols, CV_32F);
 
-
-    cv::Mat a = ones - nqp;
     cv::Mat b = nqp - npp;
 
-    for (int i = 0; i < a.rows; ++i) {
-        for (int j = 0; j < a.cols; ++j) {
-            a.at<float>(i, j) /= nzero.at<float>(i, 0);
+    for (int i = 0; i < b.rows; ++i) {
+        for (int j = 0; j < b.cols; ++j) {
+            nqp.at<float>(i, j) /= nzero.at<float>(i, 0);
             b.at<float>(i, j) /= nzero.at<float>(i, 0);
         }
     }
 
-    cv::Mat y = q.mul(a) + p.mul(b);
-
-    cv::imshow("y", y * 100);
-    cv::waitKey(0);
+    cv::Mat y = q.mul(ones - nqp) + p.mul(b);
 
     // Threshold
     targets.clear();
