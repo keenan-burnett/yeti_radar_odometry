@@ -51,10 +51,9 @@ int main() {
     // cfar1d(fft_data, window_size, scale, guard_cells, targets);
 
     float zq = 2.5;
-    int w_median = 200;
     int sigma_gauss = 17;
     int min_range = 58;
-    cen2018features(fft_data, zq, w_median, sigma_gauss, min_range, targets);
+    cen2018features(fft_data, zq, sigma_gauss, min_range, targets);
 
     std::cout << "targets: " << targets.size() << std::endl;
 

@@ -5,7 +5,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -W -Wno-unused-parameter -Og")
 
 SET(GCC_COVERAGE_LINK_FLAGS    "-lboost_filesystem -lboost_system")
 
-add_definitions(-DSTEAM_DEFAULT_NUM_OPENMP_THREADS=4)
+add_definitions(-DSTEAM_DEFAULT_NUM_OPENMP_THREADS=8)
 
 find_package(catkin REQUIRED COMPONENTS
 	steam
