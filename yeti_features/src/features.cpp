@@ -31,23 +31,21 @@ void cfar1d(cv::Mat fft_data, int window_size, float scale, int guard_cells, int
     }
 }
 
+// Runtime: 0.038s
 void cen2018features(cv::Mat fft_data, float zq, int sigma_gauss, int min_range, std::vector<cv::Point2f> &targets) {
     auto t1 = std::chrono::high_resolution_clock::now();
 
     std::vector<float> sigma_q(fft_data.rows, 0);
-    // Estimate the bias and subtract it from the signal (0.015)
+    // Estimate the bias and subtract it from the signal
     cv::Mat q = fft_data.clone();
-    int downsample = 4;
-    std::vector<float> row(fft_data.cols / downsample);
-
     for (int i = 0; i < fft_data.rows; ++i) {
-        for (uint j = 0; j < row.size(); ++j) {
-            row[j] = fft_data.at<float>(i, j * downsample);
-        }
-        std::sort(row.begin(), row.end());
-        float median = row[row.size() / 2];
+        float mean = 0;
         for (int j = 0; j < fft_data.cols; ++j) {
-            q.at<float>(i, j) = fft_data.at<float>(i, j) - median;
+            mean += fft_data.at<float>(i, j);
+        }
+        mean /= fft_data.cols;
+        for (int j = 0; j < fft_data.cols; ++j) {
+            q.at<float>(i, j) = fft_data.at<float>(i, j) - mean;
         }
     }
 
@@ -108,4 +106,165 @@ void cen2018features(cv::Mat fft_data, float zq, int sigma_gauss, int min_range,
     auto t2 = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> e = t2 - t1;
     std::cout << "feature extraction: " << e.count() << std::endl;
+}
+
+struct Point {
+    float i;
+    int a;
+    int r;
+    Point(float i_, int a_, int r_) {i = i_; a = a_; r = r_;}
+};
+
+struct greater_than_pt {
+    inline bool operator() (const Point& p1, const Point& p2) {
+        return p1.i > p2.i;
+    }
+};
+
+static void findRangeBoundaries(cv::Mat &s, int a, int r, int &rlow, int &rhigh) {
+    rlow = r;
+    rhigh = r;
+    if (r > 0) {
+        for (int i = r - 1; i >= 0; i--) {
+            if (s.at<float>(a, i) < 0)
+                rlow = i;
+            else
+                break;
+        }
+    }
+    if (r < s.rows - 1) {
+        for (int i = r + 1; i < s.cols; i++) {
+            if (s.at<float>(a, i) < 0)
+                rhigh = i;
+            else
+                break;
+        }
+    }
+}
+
+static bool checkAdjacentMarked(cv::Mat &R, int a, int start, int end) {
+    int below = a - 1;
+    int above = a + 1;
+    if (below < 0)
+        below = R.rows - 1;
+    if (above >= R.rows)
+        above = 0;
+    for (int r = start; r <= end; r++) {
+        if (R.at<float>(below, r) || R.at<float>(above, r))
+            return true;
+    }
+    return false;
+}
+
+static void getMaxInRegion(cv::Mat &h, int a, int start, int end, int &max_r) {
+    int max = -1000;
+    for (int r = start; r <= end; r++) {
+        if (h.at<float>(a, r) > max) {
+            max = h.at<float>(a, r);
+            max_r = r;
+        }
+    }
+}
+
+void cen2019features(cv::Mat fft_data, int max_points, int min_range, std::vector<cv::Point2f> &targets,
+    std::vector<float> azimuths) {
+    auto t1 = std::chrono::high_resolution_clock::now();
+
+    cv::Mat prewitt = cv::Mat::zeros(1, 3, CV_32F);
+    prewitt.at<float>(0, 0) = -1;
+    prewitt.at<float>(0, 2) = 1;
+
+    cv::Mat g;
+    cv::filter2D(fft_data, g, -1, prewitt, cv::Point(-1, -1), 0, cv::BORDER_REFLECT101);
+    g = cv::abs(g);
+    double maxg = 1, ming = 1;
+    cv::minMaxIdx(g, &ming, &maxg);
+    std::cout << "maxg: " << maxg << std::endl;
+    g /= maxg;
+
+    float mean = 0;
+    for (int i = 0; i < fft_data.rows; ++i) {
+        for (int j = 0; j < fft_data.cols; ++j) {
+            mean += fft_data.at<float>(i, j);
+        }
+    }
+    mean /= (fft_data.rows * fft_data.cols);
+    cv::Mat s = fft_data - mean;
+    cv::Mat h = s.mul(1 - g);
+
+    // Get indices in descending order of intensity
+    std::vector<Point> vec(fft_data.rows * fft_data.cols, Point(0, 0, 0));
+    for (int i = 0; i < fft_data.rows; ++i) {
+        for (int j = 0; j < fft_data.cols; ++j) {
+            vec[j + i * fft_data.cols] = Point(h.at<float>(i, j), i, j);
+        }
+    }
+    std::sort(vec.begin(), vec.end(), greater_than_pt());
+
+    std::cout << vec[0].i << " " << vec[100].i << " " << vec[200].i << std::endl;
+
+    int false_count = fft_data.rows * fft_data.cols;
+    uint j = 0;
+    int l = 0;
+    cv::Mat R = cv::Mat::zeros(fft_data.rows, fft_data.cols, CV_32F);
+    while (l < max_points && j < vec.size() && false_count > 0) {
+        if (!R.at<float>(vec[j].a, vec[j].r)) {
+            int rlow = vec[j].r;
+            int rhigh = vec[j].r;
+            findRangeBoundaries(s, vec[j].a, vec[j].r, rlow, rhigh);
+            bool already_marked = false;
+            for (int i = rlow; i <= rhigh; i++) {
+                if (R.at<float>(vec[j].a, i)) {
+                    already_marked = true;
+                    continue;
+                }
+                R.at<float>(vec[j].a, i) = 1;
+                false_count--;
+            }
+            if (!already_marked)
+                l++;
+        }
+        j++;
+    }
+
+    targets.clear();
+    for (int i = 0; i < fft_data.rows; i++) {
+        // Find continuous marked regions in each azimuth
+        int start = 0;
+        int end = 0;
+        bool counting = false;
+        for (int j = 0; j < fft_data.cols; j++) {
+            if (R.at<float>(i, j)) {
+                if (!counting) {
+                    start = j;
+                    end = j;
+                    counting = true;
+                } else {
+                    end = j;
+                }
+            } else if (counting) {
+                // Check whether adjacent azimuths contain a marked pixel in this range region
+                if (checkAdjacentMarked(R, i, start, end)) {
+                    int max_r = start;
+                    getMaxInRegion(h, i, start, end, max_r);
+                    targets.push_back(cv::Point(i, max_r));
+                }
+                counting = false;
+            }
+        }
+    }
+
+    auto t2 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> e = t2 - t1;
+    std::cout << "feature extraction: " << e.count() << std::endl;
+    // cv::Mat R_cart, G_cart, S_cart;
+    // radar_polar_to_cartesian(azimuths, R, 0.0432, 0.25, 1000, true, R_cart);
+    // radar_polar_to_cartesian(azimuths, g, 0.0432, 0.25, 1000, true, G_cart);
+    // radar_polar_to_cartesian(azimuths, s, 0.0432, 0.25, 1000, true, S_cart);
+    // cv::imshow("r", R_cart);
+    // cv::waitKey(0);
+    // cv::imshow("g", G_cart);
+    // cv::waitKey(0);
+    // cv::imshow("s", S_cart);
+    // cv::waitKey(0);
 }

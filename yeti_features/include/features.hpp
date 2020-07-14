@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <opencv2/core.hpp>
+#include "radar_utils.hpp"
 
 /*!
    \brief Extract CFAR features from the polar radar data, one azimuth at a time (1D)
@@ -23,3 +24,10 @@ void cfar1d(cv::Mat fft_data, int window_size, float scale, int guard_cells, int
    \param targets [out] vector of feature locations (azimuth_bin, range_bin)
 */
 void cen2018features(cv::Mat fft_data, float zq, int sigma_gauss, int min_range, std::vector<cv::Point2f> &targets);
+
+/*!
+   \brief "Description"
+   \param "Param description"
+*/
+void cen2019features(cv::Mat fft_data, int max_points, int min_range, std::vector<cv::Point2f> &targets,
+    std::vector<float> azimuths);

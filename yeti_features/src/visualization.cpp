@@ -53,7 +53,10 @@ int main() {
     float zq = 2.5;
     int sigma_gauss = 17;
     int min_range = 58;
-    cen2018features(fft_data, zq, sigma_gauss, min_range, targets);
+    // cen2018features(fft_data, zq, sigma_gauss, min_range, targets);
+
+    int max_points = 10000;
+    cen2019features(fft_data, max_points, min_range, targets, azimuths);
 
     std::cout << "targets: " << targets.size() << std::endl;
 
