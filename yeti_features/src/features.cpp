@@ -166,43 +166,37 @@ static void getMaxInRegion(cv::Mat &h, int a, int start, int end, int &max_r) {
     }
 }
 
-void cen2019features(cv::Mat fft_data, int max_points, int min_range, std::vector<cv::Point2f> &targets,
-    std::vector<float> azimuths) {
+// Runtime: 0.050s
+void cen2019features(cv::Mat fft_data, int max_points, int min_range, std::vector<cv::Point2f> &targets) {
     auto t1 = std::chrono::high_resolution_clock::now();
-
+    // Calculate gradient along each azimuth using the Prewitt operator
     cv::Mat prewitt = cv::Mat::zeros(1, 3, CV_32F);
     prewitt.at<float>(0, 0) = -1;
     prewitt.at<float>(0, 2) = 1;
-
     cv::Mat g;
     cv::filter2D(fft_data, g, -1, prewitt, cv::Point(-1, -1), 0, cv::BORDER_REFLECT101);
     g = cv::abs(g);
     double maxg = 1, ming = 1;
     cv::minMaxIdx(g, &ming, &maxg);
-    std::cout << "maxg: " << maxg << std::endl;
     g /= maxg;
 
-    float mean = 0;
-    for (int i = 0; i < fft_data.rows; ++i) {
-        for (int j = 0; j < fft_data.cols; ++j) {
-            mean += fft_data.at<float>(i, j);
-        }
-    }
-    mean /= (fft_data.rows * fft_data.cols);
+    // Subtract the mean from the radar data and scale it by 1 - gradient magnitude
+    float mean = cv::mean(fft_data)[0];
     cv::Mat s = fft_data - mean;
     cv::Mat h = s.mul(1 - g);
+    float mean_h = cv::mean(h)[0];
 
     // Get indices in descending order of intensity
-    std::vector<Point> vec(fft_data.rows * fft_data.cols, Point(0, 0, 0));
+    std::vector<Point> vec;
     for (int i = 0; i < fft_data.rows; ++i) {
         for (int j = 0; j < fft_data.cols; ++j) {
-            vec[j + i * fft_data.cols] = Point(h.at<float>(i, j), i, j);
+            if (h.at<float>(i, j) > mean_h)
+                vec.push_back(Point(h.at<float>(i, j), i, j));
         }
     }
     std::sort(vec.begin(), vec.end(), greater_than_pt());
 
-    std::cout << vec[0].i << " " << vec[100].i << " " << vec[200].i << std::endl;
-
+    // Create a matrix, R, of "marked" regions consisting of continuous regions of an azimuth that may contain a target
     int false_count = fft_data.rows * fft_data.cols;
     uint j = 0;
     int l = 0;
@@ -228,12 +222,14 @@ void cen2019features(cv::Mat fft_data, int max_points, int min_range, std::vecto
     }
 
     targets.clear();
+#pragma omp declare reduction(merge : std::vector<cv::Point2f> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))  // NOLINT
+#pragma omp parallel for reduction(merge: targets)
     for (int i = 0; i < fft_data.rows; i++) {
-        // Find continuous marked regions in each azimuth
+        // Find the continuous marked regions in each azimuth
         int start = 0;
         int end = 0;
         bool counting = false;
-        for (int j = 0; j < fft_data.cols; j++) {
+        for (int j = min_range; j < fft_data.cols; j++) {
             if (R.at<float>(i, j)) {
                 if (!counting) {
                     start = j;
@@ -253,18 +249,7 @@ void cen2019features(cv::Mat fft_data, int max_points, int min_range, std::vecto
             }
         }
     }
-
     auto t2 = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> e = t2 - t1;
     std::cout << "feature extraction: " << e.count() << std::endl;
-    // cv::Mat R_cart, G_cart, S_cart;
-    // radar_polar_to_cartesian(azimuths, R, 0.0432, 0.25, 1000, true, R_cart);
-    // radar_polar_to_cartesian(azimuths, g, 0.0432, 0.25, 1000, true, G_cart);
-    // radar_polar_to_cartesian(azimuths, s, 0.0432, 0.25, 1000, true, S_cart);
-    // cv::imshow("r", R_cart);
-    // cv::waitKey(0);
-    // cv::imshow("g", G_cart);
-    // cv::waitKey(0);
-    // cv::imshow("s", S_cart);
-    // cv::waitKey(0);
 }

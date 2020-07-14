@@ -26,8 +26,10 @@ void cfar1d(cv::Mat fft_data, int window_size, float scale, int guard_cells, int
 void cen2018features(cv::Mat fft_data, float zq, int sigma_gauss, int min_range, std::vector<cv::Point2f> &targets);
 
 /*!
-   \brief "Description"
-   \param "Param description"
+   \brief Extract features from polar radar data using the method described in cen_icra19
+   \param fft_data Polar radar power readings
+   \param max_points Maximum number of targets points to be extracted from the radar image
+   \param min_range We ignore the range bins less than this
+   \param targets [out] vector of feature locations (azimuth_bin, range_bin)
 */
-void cen2019features(cv::Mat fft_data, int max_points, int min_range, std::vector<cv::Point2f> &targets,
-    std::vector<float> azimuths);
+void cen2019features(cv::Mat fft_data, int max_points, int min_range, std::vector<cv::Point2f> &targets);

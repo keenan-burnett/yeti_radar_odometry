@@ -44,19 +44,19 @@ int main() {
         interpolate_crossover, cart_img);
 
     std::vector<cv::Point2f> targets;
+    int min_range = 58;
 
     // int window_size = 128;
     // float scale = 3.5;
     // int guard_cells = 32;
     // cfar1d(fft_data, window_size, scale, guard_cells, targets);
 
-    float zq = 2.5;
-    int sigma_gauss = 17;
-    int min_range = 58;
+    // float zq = 2.5;
+    // int sigma_gauss = 17;
     // cen2018features(fft_data, zq, sigma_gauss, min_range, targets);
 
     int max_points = 10000;
-    cen2019features(fft_data, max_points, min_range, targets, azimuths);
+    cen2019features(fft_data, max_points, min_range, targets);
 
     std::cout << "targets: " << targets.size() << std::endl;
 
