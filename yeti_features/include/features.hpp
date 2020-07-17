@@ -10,10 +10,9 @@
    \param scale local clutter power is multiplied by scale
    \param guard_cells How many cells on the left and right side of the test cell are ignored before estimation
    \param min_range We ignore the range bins less than this
-   \param targets [out] vector of feature locations (azimuth_bin, range_bin)
+   \param targets [out] Matrix of feature locations (azimuth_bin, range_bin, 1) x N
 */
-void cfar1d(cv::Mat fft_data, int window_size, float scale, int guard_cells, int min_range,
-    std::vector<cv::Point2f> & targets);
+void cfar1d(cv::Mat fft_data, int window_size, float scale, int guard_cells, int min_range, Eigen::MatrixXf &targets);
 
 /*!
    \brief Extract features from polar radar data using the method described in cen_icra18
@@ -21,15 +20,15 @@ void cfar1d(cv::Mat fft_data, int window_size, float scale, int guard_cells, int
    \param zq If y(i, j) > zq * sigma_q then it is considered a potential target point
    \param sigma_gauss std dev of the gaussian filter uesd to smooth the radar signal
    \param min_range We ignore the range bins less than this
-   \param targets [out] vector of feature locations (azimuth_bin, range_bin)
+   \param targets [out] Matrix of feature locations (azimuth_bin, range_bin, 1) x N
 */
-void cen2018features(cv::Mat fft_data, float zq, int sigma_gauss, int min_range, std::vector<cv::Point2f> &targets);
+void cen2018features(cv::Mat fft_data, float zq, int sigma_gauss, int min_range, Eigen::MatrixXf &targets);
 
 /*!
    \brief Extract features from polar radar data using the method described in cen_icra19
    \param fft_data Polar radar power readings
    \param max_points Maximum number of targets points to be extracted from the radar image
    \param min_range We ignore the range bins less than this
-   \param targets [out] vector of feature locations (azimuth_bin, range_bin)
+   \param targets [out] Matrix of feature locations (azimuth_bin, range_bin, 1) x N
 */
-void cen2019features(cv::Mat fft_data, int max_points, int min_range, std::vector<cv::Point2f> &targets);
+void cen2019features(cv::Mat fft_data, int max_points, int min_range, Eigen::MatrixXf &targets);

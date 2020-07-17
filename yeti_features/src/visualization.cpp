@@ -43,7 +43,7 @@ int main() {
     radar_polar_to_cartesian(azimuths, fft_data, radar_resolution, cart_resolution, cart_pixel_width,
         interpolate_crossover, cart_img);
 
-    std::vector<cv::Point2f> targets;
+    Eigen::MatrixXf targets;
     int min_range = 58;
 
     // int window_size = 128;
@@ -58,9 +58,9 @@ int main() {
     int max_points = 10000;
     cen2019features(fft_data, max_points, min_range, targets);
 
-    std::cout << "targets: " << targets.size() << std::endl;
+    std::cout << "targets: " << targets.cols() << std::endl;
 
-    std::vector<cv::Point2f> cart_targets;
+    Eigen::MatrixXf cart_targets;
     polar_to_cartesian_points(azimuths, targets, radar_resolution, cart_targets);
     std::vector<cv::Point> bev_points;
     convert_to_bev(cart_targets, cart_resolution, cart_pixel_width, bev_points);

@@ -77,26 +77,26 @@ void radar_polar_to_cartesian(std::vector<float> azimuths, cv::Mat fft_data, flo
     cv::remap(fft_data, cart_img, range, angle, cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
 }
 
-void polar_to_cartesian_points(std::vector<float> azimuths, std ::vector<cv::Point2f> polar_points,
-    float radar_resolution, std::vector<cv::Point2f> &cart_points) {
+void polar_to_cartesian_points(std::vector<float> azimuths, Eigen::MatrixXf polar_points,
+    float radar_resolution, Eigen::MatrixXf &cart_points) {
     cart_points = polar_points;
-    for (uint i = 0; i < polar_points.size(); ++i) {
-        float azimuth = azimuths[polar_points[i].x];
-        float r = polar_points[i].y * radar_resolution + radar_resolution / 2;
-        cart_points[i].x = r * cos(azimuth);
-        cart_points[i].y = r * sin(azimuth);
+    for (uint i = 0; i < polar_points.cols(); ++i) {
+        float azimuth = azimuths[polar_points(0, i)];
+        float r = polar_points(1, i) * radar_resolution + radar_resolution / 2;
+        cart_points(0, i) = r * cos(azimuth);
+        cart_points(1, i) = r * sin(azimuth);
     }
 }
 
-void convert_to_bev(std::vector<cv::Point2f> cart_points, float cart_resolution, int cart_pixel_width,
+void convert_to_bev(Eigen::MatrixXf cart_points, float cart_resolution, int cart_pixel_width,
     std::vector<cv::Point> &bev_points) {
     float cart_min_range = (cart_pixel_width / 2) * cart_resolution;
     if (cart_pixel_width % 2 == 0)
         cart_min_range = (cart_pixel_width / 2 - 0.5) * cart_resolution;
     bev_points.clear();
-    for (uint i = 0; i < cart_points.size(); ++i) {
-        int u = (cart_min_range + cart_points[i].y) / cart_resolution;
-        int v = (cart_min_range - cart_points[i].x) / cart_resolution;
+    for (uint i = 0; i < cart_points.cols(); ++i) {
+        int u = (cart_min_range + cart_points(1, i)) / cart_resolution;
+        int v = (cart_min_range - cart_points(0, i)) / cart_resolution;
         if (0 < u && u < cart_pixel_width && 0 < v && v < cart_pixel_width)
             bev_points.push_back(cv::Point(u, v));
     }

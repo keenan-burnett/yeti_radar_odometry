@@ -2,6 +2,7 @@
 #include <iostream>
 #include <vector>
 #include <string>
+#include <Eigen/Dense>
 #include <opencv2/core.hpp>
 #include <boost/algorithm/string.hpp>
 
@@ -47,8 +48,8 @@ void radar_polar_to_cartesian(std::vector<float> azimuths, cv::Mat fft_data, flo
    \param radar_resolution Resolution of the polar radar data (metres per pixel)
    \param cart_points [out] Vector of points in cartesian space (x, y) in metric
 */
-void polar_to_cartesian_points(std::vector<float> azimuths, std ::vector<cv::Point2f> polar_points,
-    float radar_resolution, std::vector<cv::Point2f> &cart_points);
+void polar_to_cartesian_points(std::vector<float> azimuths, Eigen::MatrixXf polar_points, float radar_resolution,
+    Eigen::MatrixXf &cart_points);
 
 /*!
    \brief Converts points from metric cartesian coordinates to pixel coordinates in the BEV image
@@ -57,5 +58,5 @@ void polar_to_cartesian_points(std::vector<float> azimuths, std ::vector<cv::Poi
    \param cart_pixel_width: Width and height of the returned square cartesian output (pixels)
    \param bev_points [out] Vector of pixel locations in the BEV cartesian image (u, v)
 */
-void convert_to_bev(std::vector<cv::Point2f> cart_points, float cart_resolution, int cart_pixel_width,
+void convert_to_bev(Eigen::MatrixXf cart_points, float cart_resolution, int cart_pixel_width,
     std::vector<cv::Point> &bev_points);

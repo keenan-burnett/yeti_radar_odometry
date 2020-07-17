@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
     load_radar(datadir + "/" + radar_files[101], t2, a2, v2, f2);
 
     // Extract features
-    std::vector<cv::Point2f> targets1, targets2;
+    Eigen::MatrixXf targets1, targets2;
     int min_range = 58;
     int max_points = 10000;
     cen2019features(f1, max_points, min_range, targets1);
@@ -85,7 +85,7 @@ int main(int argc, char *argv[]) {
     radar_polar_to_cartesian(a1, f1, radar_resolution, cart_resolution, cart_pixel_width, true, cart_img1);
     radar_polar_to_cartesian(a2, f2, radar_resolution, cart_resolution, cart_pixel_width, true, cart_img2);
 
-    std::vector<cv::Point2f> cart_targets1, cart_targets2;
+    Eigen::MatrixXf cart_targets1, cart_targets2;
     polar_to_cartesian_points(a1, targets1, radar_resolution, cart_targets1);
     polar_to_cartesian_points(a2, targets2, radar_resolution, cart_targets2);
     std::vector<cv::Point> bev_points1, bev_points2;
