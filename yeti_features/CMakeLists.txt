@@ -29,15 +29,12 @@ include_directories(
 	${Boost_INCLUDE_DIRS}
 )
 
-add_library(features src/features.cpp)
-target_link_libraries(features
-	${catkin_LIBRARIES}
-	${OpenCV_LIBRARIES}
-	${Boost_INCLUDE_DIRS}
+add_library(yeti_features_lib
+  src/features.cpp
+  src/radar_utils.cpp
 )
 
-add_library(radar_utils src/radar_utils.cpp)
-target_link_libraries(radar_utils
+target_link_libraries(yeti_features_lib
 	${catkin_LIBRARIES}
 	${OpenCV_LIBRARIES}
 	${Boost_INCLUDE_DIRS}
@@ -45,8 +42,7 @@ target_link_libraries(radar_utils
 
 add_executable(visualization src/visualization.cpp)
 target_link_libraries(visualization
-    features
-    radar_utils
+    yeti_features_lib
 	${catkin_LIBRARIES}
 	${OpenCV_LIBRARIES}
 	${Boost_INCLUDE_DIRS}

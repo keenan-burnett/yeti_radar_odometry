@@ -9,8 +9,10 @@
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>steam</build_depend>
   <build_depend>lgmath</build_depend>
+  <build_depend>yeti_features</build_depend>
   <run_depend>steam</run_depend>
   <run_depend>lgmath</run_depend>
+  <run_depend>yeti_features</run_depend>
   <export>
   </export>
 </package>

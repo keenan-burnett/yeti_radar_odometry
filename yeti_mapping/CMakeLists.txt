@@ -3,12 +3,11 @@ cmake_minimum_required(VERSION 3.1)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -W -Wno-unused-parameter")
 
-
-
 add_definitions(-DSTEAM_DEFAULT_NUM_OPENMP_THREADS=4)
 
 find_package(catkin REQUIRED COMPONENTS
 	steam
+    yeti_features
 )
 
 find_package(OpenMP REQUIRED)
@@ -22,10 +21,13 @@ find_package(Boost REQUIRED COMPONENTS
 )
 find_package(PkgConfig)
 
+find_package(libpointmatcher REQUIRED)
+
 include_directories(
 	include
 	${catkin_INCLUDE_DIRS}
 	${OpenCV_INCLUDE_DIRS}
+    ${libpointmatcher_INCLUDE_DIRS}
 )
 
 add_executable(mapping src/mapping.cpp)
@@ -33,4 +35,11 @@ target_link_libraries(mapping
 	${DEPEND_LIBS}
 	${catkin_LIBRARIES}
 	${OpenCV_LIBRARIES}
+)
+
+add_executable(scan_matching src/scan_matching.cpp)
+target_link_libraries(scan_matching
+	${catkin_LIBRARIES}
+	${OpenCV_LIBRARIES}
+    ${libpointmatcher_LIBRARIES}
 )

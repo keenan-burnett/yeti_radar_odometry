@@ -7,6 +7,9 @@
   <author>Keenan Burnett</author>
   <license>BSD</license>
   <buildtool_depend>catkin</buildtool_depend>
+  <exec_depend>yeti_features</exec_depend>
+  <exec_depend>yeti_localization</exec_depend>
+  <exec_depend>yeti_mapping</exec_depend>
   <export>
     <metapackage/>
   </export>
