@@ -26,28 +26,10 @@ void draw_points(std::string name, cv::Mat x, std::vector<cv::Point> points, cv:
     }
 }
 
-void validateArgs(int argc, char *argv[], bool& isCSV )
-{
-	if (argc != 3)
-	{
-		std::cerr << "Wrong number of arguments, usage " << argv[0] << " reference.csv reading.csv" << std::endl;
-		std::cerr << "Will create 3 vtk files for inspection: ./test_ref.vtk, ./test_data_in.vtk and ./test_data_out.vtk" << std::endl;
-		std::cerr << std::endl << "2D Example:" << std::endl;
-		std::cerr << "  " << argv[0] << " ../../examples/data/2D_twoBoxes.csv ../../examples/data/2D_oneBox.csv" << std::endl;
-		std::cerr << std::endl << "3D Example:" << std::endl;
-		std::cerr << "  " << argv[0] << " ../../examples/data/car_cloud400.csv ../../examples/data/car_cloud401.csv" << std::endl;
-		exit(1);
-	}
-}
-
 typedef PointMatcher<float> PM;
 typedef PM::DataPoints DP;
 
 int main(int argc, char *argv[]) {
-    bool isCSV = true;
-    validateArgs(argc, argv, isCSV);
-
-
     std::string datadir = "/home/keenan/Documents/data/2019-01-10-14-36-48-radar-oxford-10k-partial/radar";
     float cart_resolution = 0.25;
     int cart_pixel_width = 1000;
@@ -80,26 +62,52 @@ int main(int argc, char *argv[]) {
     cen2019features(f1, max_points, min_range, targets1);
     cen2019features(f2, max_points, min_range, targets2);
 
+    // Convert targets to cartesian coordinates
+    Eigen::MatrixXf cart_targets1, cart_targets2;
+    polar_to_cartesian_points(a1, targets1, radar_resolution, cart_targets1);
+    polar_to_cartesian_points(a2, targets2, radar_resolution, cart_targets2);
+
     // Visualize targets on top of the cartesian radar images
     cv::Mat cart_img1, cart_img2;
     radar_polar_to_cartesian(a1, f1, radar_resolution, cart_resolution, cart_pixel_width, true, cart_img1);
     radar_polar_to_cartesian(a2, f2, radar_resolution, cart_resolution, cart_pixel_width, true, cart_img2);
-
-    Eigen::MatrixXf cart_targets1, cart_targets2;
-    polar_to_cartesian_points(a1, targets1, radar_resolution, cart_targets1);
-    polar_to_cartesian_points(a2, targets2, radar_resolution, cart_targets2);
     std::vector<cv::Point> bev_points1, bev_points2;
     convert_to_bev(cart_targets1, cart_resolution, cart_pixel_width, bev_points1);
     convert_to_bev(cart_targets2, cart_resolution, cart_pixel_width, bev_points2);
-
     cv::Mat vis1, vis2;
     draw_points("1", cart_img1, bev_points1, vis1);
     draw_points("2", cart_img2, bev_points2, vis2);
-
     cv::Mat combined;
     cv::hconcat(vis1, vis2, combined);
     cv::imshow("combo", combined);
     cv::waitKey(0);
+
+    // Convert to libpointmatcher DataPoint class
+    DP::Labels labels;
+    labels.push_back(DP::Label("x", 1));
+    labels.push_back(DP::Label("y", 1));
+    labels.push_back(DP::Label("w", 1));
+    DP ref(cart_targets1, labels);
+    DP data(cart_targets2, labels);
+
+    // Create the default ICP algorithm
+    PM::ICP icp;
+    // See the implementation of setDefault() to create a custom ICP algorithm
+	icp.setDefault();
+
+	// Compute the transformation to express data in ref
+	PM::TransformationParameters T = icp(data, ref);
+
+	// Transform data to express it in ref
+	DP data_out(data);
+	icp.transformations.apply(data_out, T);
+
+	// Safe files to see the results
+	ref.save("test_ref.vtk");
+	data.save("test_data_in.vtk");
+	data_out.save("test_data_out.vtk");
+	std::cout << "Final transformation:" << std::endl << T << std::endl;
+
 
     return 0;
 }
