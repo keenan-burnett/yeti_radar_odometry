@@ -1,7 +1,37 @@
 #include <math.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <dirent.h>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include "radar_utils.hpp"
+
+static inline bool exists(const std::string& name) {
+    struct stat buffer;
+    return !(stat (name.c_str(), &buffer) == 0);
+}
+
+struct less_than_img {
+    inline bool operator() (const std::string& img1, const std::string& img2) {
+        std::vector<std::string> parts;
+        boost::split(parts, img1, boost::is_any_of("."));
+        int64 i1 = std::stoll(parts[0]);
+        boost::split(parts, img2, boost::is_any_of("."));
+        int64 i2 = std::stoll(parts[0]);
+        return i1 < i2;
+    }
+};
+
+void get_file_names(std::string datadir, std::vector<std::string> &radar_files) {
+    DIR *dirp = opendir(datadir.c_str());
+    struct dirent *dp;
+    while ((dp = readdir(dirp)) != NULL) {
+        if (exists(dp->d_name))
+            radar_files.push_back(dp->d_name);
+    }
+    // Sort files in ascending order of time stamp
+    std::sort(radar_files.begin(), radar_files.end(), less_than_img());
+}
 
 void load_radar(std::string path, std::vector<int64_t> &timestamps, std::vector<float> &azimuths,
     std::vector<bool> &valid, cv::Mat &fft_data) {
@@ -99,5 +129,15 @@ void convert_to_bev(Eigen::MatrixXf cart_points, float cart_resolution, int cart
         int v = (cart_min_range - cart_points(0, i)) / cart_resolution;
         if (0 < u && u < cart_pixel_width && 0 < v && v < cart_pixel_width)
             bev_points.push_back(cv::Point(u, v));
+    }
+}
+
+void draw_points(cv::Mat cart_img, Eigen::MatrixXf cart_targets, float cart_resolution, int cart_pixel_width,
+    cv::Mat &vis) {
+    std::vector<cv::Point> bev_points;
+    convert_to_bev(cart_targets, cart_resolution, cart_pixel_width, bev_points);
+    cv::cvtColor(cart_img, vis, cv::COLOR_GRAY2BGR);
+    for (cv::Point p : bev_points) {
+        cv::circle(vis, p, 1, cv::Scalar(0, 0, 255), -1);
     }
 }

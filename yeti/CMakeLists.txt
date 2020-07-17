@@ -67,8 +67,17 @@ target_link_libraries(mapping
 	${OpenCV_LIBRARIES}
 )
 
-add_executable(scan_matching src/scan_matching.cpp)
-target_link_libraries(scan_matching
+add_executable(scan_matching_basic src/scan_matching_basic.cpp)
+target_link_libraries(scan_matching_basic
+    features
+    radar_utils
+	${catkin_LIBRARIES}
+	${OpenCV_LIBRARIES}
+    ${libpointmatcher_LIBRARIES}
+)
+
+add_executable(scan_matching_test src/test_scan_matching.cpp)
+target_link_libraries(scan_matching_test
     features
     radar_utils
 	${catkin_LIBRARIES}

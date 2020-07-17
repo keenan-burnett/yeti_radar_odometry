@@ -1,0 +1,30 @@
+readingDataPointsFilters:
+  - IdentityDataPointsFilter
+
+referenceDataPointsFilters:
+  - IdentityDataPointsFilter
+
+matcher:
+  KDTreeMatcher:
+    knn: 1
+
+outlierFilters:
+  - TrimmedDistOutlierFilter:
+      ratio: 0.90
+
+errorMinimizer:
+  PointToPointErrorMinimizer
+
+transformationCheckers:
+  - CounterTransformationChecker:
+      maxIterationCount: 40
+  - DifferentialTransformationChecker:
+      minDiffRotErr: 0.001
+      minDiffTransErr: 0.01
+      smoothLength: 4
+
+inspector:
+  NullInspector
+
+logger:
+  FileLogger

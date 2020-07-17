@@ -1,49 +1,26 @@
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <dirent.h>
 #include <iostream>
 #include <string>
-#include <cassert>
 #include <fstream>
-#include <algorithm>
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include "radar_utils.hpp"
 #include "features.hpp"
 #include "pointmatcher/PointMatcher.h"
-#include "boost/filesystem.hpp"
-
-inline bool exists(const std::string& name) {
-    struct stat buffer;
-    return !(stat (name.c_str(), &buffer) == 0);
-}
-
-void draw_points(std::string name, cv::Mat x, std::vector<cv::Point> points, cv::Mat &vis) {
-    cv::cvtColor(x, vis, cv::COLOR_GRAY2BGR);
-    for (cv::Point p : points) {
-        cv::circle(vis, p, 1, cv::Scalar(0, 0, 255), -1);
-    }
-}
 
 typedef PointMatcher<float> PM;
 typedef PM::DataPoints DP;
 
 int main(int argc, char *argv[]) {
     std::string datadir = "/home/keenan/Documents/data/2019-01-10-14-36-48-radar-oxford-10k-partial/radar";
+    std::string gt = "/home/keenan/Documents/data/2019-01-10-14-36-48-radar-oxford-10k-partial/gt/radar_odometry.csv";
+    std::string config = "/home/keenan/radar_ws/src/yeti/yeti/config/icp.yaml";
     float cart_resolution = 0.25;
     int cart_pixel_width = 1000;
 
     // Get file names of the radar images
-    DIR *dirp = opendir(datadir.c_str());
-    struct dirent *dp;
     std::vector<std::string> radar_files;
-    while ((dp = readdir(dirp)) != NULL) {
-        if (exists(dp->d_name))
-            radar_files.push_back(dp->d_name);
-    }
-    // Sort files in ascending order of time stamp
-    std::sort(radar_files.begin(), radar_files.end(), less_than_img());
+    get_file_names(datadir, radar_files);
 
     float radar_resolution = 0.0432;
     std::vector<int64_t> t1, t2;
@@ -51,9 +28,16 @@ int main(int argc, char *argv[]) {
     std::vector<bool> v1, v2;
     cv::Mat f1, f2;
 
+    // for (uint i = 0; i < radar_files.size(); ++i) {
+    //
+    // }
+
     // Read the two radar images
-    load_radar(datadir + "/" + radar_files[100], t1, a1, v1, f1);
-    load_radar(datadir + "/" + radar_files[101], t2, a2, v2, f2);
+    load_radar(datadir + "/" + radar_files[0], t1, a1, v1, f1);
+    load_radar(datadir + "/" + radar_files[1], t2, a2, v2, f2);
+
+    std::cout << "R1: " << radar_files[0] << std::endl;
+    std::cout << "R2: " << radar_files[1] << std::endl;
 
     // Extract features
     Eigen::MatrixXf targets1, targets2;
@@ -70,14 +54,10 @@ int main(int argc, char *argv[]) {
     // Visualize targets on top of the cartesian radar images
     cv::Mat cart_img1, cart_img2;
     radar_polar_to_cartesian(a1, f1, radar_resolution, cart_resolution, cart_pixel_width, true, cart_img1);
-    radar_polar_to_cartesian(a2, f2, radar_resolution, cart_resolution, cart_pixel_width, true, cart_img2);
-    std::vector<cv::Point> bev_points1, bev_points2;
-    convert_to_bev(cart_targets1, cart_resolution, cart_pixel_width, bev_points1);
-    convert_to_bev(cart_targets2, cart_resolution, cart_pixel_width, bev_points2);
-    cv::Mat vis1, vis2;
-    draw_points("1", cart_img1, bev_points1, vis1);
-    draw_points("2", cart_img2, bev_points2, vis2);
-    cv::Mat combined;
+    radar_polar_to_cartesian(a2, f2, radar_resolution, cart_resolution, cart_pixel_width, true, cart_img2);;
+    cv::Mat vis1, vis2, combined;
+    draw_points(cart_img1, cart_targets1, cart_resolution, cart_pixel_width, vis1);
+    draw_points(cart_img2, cart_targets2, cart_resolution, cart_pixel_width, vis2);
     cv::hconcat(vis1, vis2, combined);
     cv::imshow("combo", combined);
     cv::waitKey(0);
@@ -93,21 +73,34 @@ int main(int argc, char *argv[]) {
     // Create the default ICP algorithm
     PM::ICP icp;
     // See the implementation of setDefault() to create a custom ICP algorithm
-	icp.setDefault();
+    if (config.empty()) {
+           icp.setDefault();
+    } else {
+        std::ifstream ifs(config.c_str());
+        if (!ifs.good()) {
+            std::cerr << "Cannot open config file " << config << std::endl; exit(1);
+        }
+        icp.loadFromYaml(ifs);
+    }
 
-	// Compute the transformation to express data in ref
-	PM::TransformationParameters T = icp(data, ref);
+    // Compute the transformation to express data in ref
+    PM::TransformationParameters T = icp(data, ref);
 
-	// Transform data to express it in ref
-	DP data_out(data);
-	icp.transformations.apply(data_out, T);
+    // Transform data to express it in ref
+    DP data_out(data);
+    icp.transformations.apply(data_out, T);
 
-	// Safe files to see the results
-	ref.save("test_ref.vtk");
-	data.save("test_data_in.vtk");
-	data_out.save("test_data_out.vtk");
-	std::cout << "Final transformation:" << std::endl << T << std::endl;
+    // Safe files to see the results
+    ref.save("test_ref.vtk");
+    data.save("test_data_in.vtk");
+    data_out.save("test_data_out.vtk");
+    std::cout << "Final transformation:" << std::endl << T << std::endl;
 
+    std::vector<std::string> parts;
+    boost::split(parts, radar_files[1], boost::is_any_of("."));
+    int64 r2 = std::stol(parts[0]);
+
+    std::cout << "Ground truth: " << r2 << std::endl;
 
     return 0;
 }

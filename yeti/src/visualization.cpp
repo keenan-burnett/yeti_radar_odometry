@@ -1,6 +1,3 @@
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <dirent.h>
 #include <iostream>
 #include <string>
 #include <opencv2/core.hpp>
@@ -9,11 +6,6 @@
 #include "radar_utils.hpp"
 #include "features.hpp"
 
-inline bool exists(const std::string& name) {
-    struct stat buffer;
-    return !(stat (name.c_str(), &buffer) == 0);
-}
-
 int main() {
     std::string datadir = "/home/keenan/Documents/data/2019-01-10-14-36-48-radar-oxford-10k-partial/radar";
     float cart_resolution = 0.25;
@@ -21,15 +13,8 @@ int main() {
     bool interpolate_crossover = true;
 
     // Get file names of the radar images
-    DIR *dirp = opendir(datadir.c_str());
-    struct dirent *dp;
     std::vector<std::string> radar_files;
-    while ((dp = readdir(dirp)) != NULL) {
-        if (exists(dp->d_name))
-            radar_files.push_back(dp->d_name);
-    }
-    // Sort files in ascending order of time stamp
-    std::sort(radar_files.begin(), radar_files.end(), less_than_img());
+    get_file_names(datadir, radar_files);
 
     float radar_resolution = 0.0432;
     std::vector<int64_t> timestamps;
@@ -62,14 +47,8 @@ int main() {
 
     Eigen::MatrixXf cart_targets;
     polar_to_cartesian_points(azimuths, targets, radar_resolution, cart_targets);
-    std::vector<cv::Point> bev_points;
-    convert_to_bev(cart_targets, cart_resolution, cart_pixel_width, bev_points);
-
     cv::Mat vis;
-    cv::cvtColor(cart_img, vis, cv::COLOR_GRAY2BGR);
-    for (cv::Point p : bev_points) {
-        cv::circle(vis, p, 1, cv::Scalar(0, 0, 255), -1);
-    }
+    draw_points(cart_img, cart_targets, cart_resolution, cart_pixel_width, vis);
     cv::imshow("cart", vis);
     cv::waitKey(0);
 
