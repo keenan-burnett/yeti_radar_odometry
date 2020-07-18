@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <fstream>
+#include <chrono>
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
@@ -17,10 +18,18 @@ int main(int argc, char *argv[]) {
     std::string config = "/home/keenan/radar_ws/src/yeti/yeti/config/icp.yaml";
     float cart_resolution = 0.25;
     int cart_pixel_width = 1000;
+    int min_range = 58;
+    int max_points = 10000;
 
     // Get file names of the radar images
     std::vector<std::string> radar_files;
     get_file_names(datadir, radar_files);
+
+    // File for storing the results of ICP on each frame (and the accuracy)
+    std::string accfile = "accuracy.csv";
+    std::ofstream ofs;
+    ofs.open(accfile, std::ios::out);
+    ofs << "x,y,yaw,gtx,gty,gtyaw,time1,time2\n";
 
     float radar_resolution = 0.0432;
     std::vector<int64_t> t1, t2;
@@ -28,51 +37,9 @@ int main(int argc, char *argv[]) {
     std::vector<bool> v1, v2;
     cv::Mat f1, f2;
 
-    // for (uint i = 0; i < radar_files.size(); ++i) {
-    //
-    // }
-
-    // Read the two radar images
-    load_radar(datadir + "/" + radar_files[0], t1, a1, v1, f1);
-    load_radar(datadir + "/" + radar_files[1], t2, a2, v2, f2);
-
-    std::cout << "R1: " << radar_files[0] << std::endl;
-    std::cout << "R2: " << radar_files[1] << std::endl;
-
-    // Extract features
-    Eigen::MatrixXf targets1, targets2;
-    int min_range = 58;
-    int max_points = 10000;
-    cen2019features(f1, max_points, min_range, targets1);
-    cen2019features(f2, max_points, min_range, targets2);
-
-    // Convert targets to cartesian coordinates
-    Eigen::MatrixXf cart_targets1, cart_targets2;
-    polar_to_cartesian_points(a1, targets1, radar_resolution, cart_targets1);
-    polar_to_cartesian_points(a2, targets2, radar_resolution, cart_targets2);
-
-    // Visualize targets on top of the cartesian radar images
-    cv::Mat cart_img1, cart_img2;
-    radar_polar_to_cartesian(a1, f1, radar_resolution, cart_resolution, cart_pixel_width, true, cart_img1);
-    radar_polar_to_cartesian(a2, f2, radar_resolution, cart_resolution, cart_pixel_width, true, cart_img2);;
-    cv::Mat vis1, vis2, combined;
-    draw_points(cart_img1, cart_targets1, cart_resolution, cart_pixel_width, vis1);
-    draw_points(cart_img2, cart_targets2, cart_resolution, cart_pixel_width, vis2);
-    cv::hconcat(vis1, vis2, combined);
-    cv::imshow("combo", combined);
-    cv::waitKey(0);
-
-    // Convert to libpointmatcher DataPoint class
-    DP::Labels labels;
-    labels.push_back(DP::Label("x", 1));
-    labels.push_back(DP::Label("y", 1));
-    labels.push_back(DP::Label("w", 1));
-    DP ref(cart_targets1, labels);
-    DP data(cart_targets2, labels);
-
-    // Create the default ICP algorithm
+    // Create the ICP object
     PM::ICP icp;
-    // See the implementation of setDefault() to create a custom ICP algorithm
+    // Use custom ICP parameters
     if (config.empty()) {
            icp.setDefault();
     } else {
@@ -82,25 +49,66 @@ int main(int argc, char *argv[]) {
         }
         icp.loadFromYaml(ifs);
     }
+    DP::Labels labels;
+    labels.push_back(DP::Label("x", 1));
+    labels.push_back(DP::Label("y", 1));
+    labels.push_back(DP::Label("w", 1));
 
-    // Compute the transformation to express data in ref
-    PM::TransformationParameters T = icp(data, ref);
+    DP ref, data;
 
-    // Transform data to express it in ref
-    DP data_out(data);
-    icp.transformations.apply(data_out, T);
+    double icptime;
 
-    // Safe files to see the results
-    ref.save("test_ref.vtk");
-    data.save("test_data_in.vtk");
-    data_out.save("test_data_out.vtk");
-    std::cout << "Final transformation:" << std::endl << T << std::endl;
+    for (uint i = 0; i < radar_files.size() - 1; ++i) {
+        if (i == 0) {
+            // Read the two radar images
+            load_radar(datadir + "/" + radar_files[i], t1, a1, v1, f1);
+            load_radar(datadir + "/" + radar_files[i + 1], t2, a2, v2, f2);
+            // Extract features
+            Eigen::MatrixXf targets1, targets2;
+            cen2019features(f1, max_points, min_range, targets1);
+            cen2019features(f2, max_points, min_range, targets2);
+            // Convert targets to cartesian coordinates
+            Eigen::MatrixXf cart_targets1, cart_targets2;
+            polar_to_cartesian_points(a1, targets1, radar_resolution, cart_targets1);
+            polar_to_cartesian_points(a2, targets2, radar_resolution, cart_targets2);
+            // Convert to libpointmatcher DataPoint class
+            ref = DP(cart_targets1, labels);
+            data = DP(cart_targets2, labels);
+        } else {
+            t1 = t2; a1 = a2; v1 = v2; f1 = f2;
+            load_radar(datadir + "/" + radar_files[i + 1], t2, a2, v2, f2);
+            Eigen::MatrixXf targets2;
+            cen2019features(f2, max_points, min_range, targets2);
+            Eigen::MatrixXf cart_targets2;
+            polar_to_cartesian_points(a2, targets2, radar_resolution, cart_targets2);
+            ref = data;
+            data = DP(cart_targets2, labels);
+        }
 
-    std::vector<std::string> parts;
-    boost::split(parts, radar_files[1], boost::is_any_of("."));
-    int64 r2 = std::stol(parts[0]);
+        // Compute the transformation to express data in ref
+        auto start = std::chrono::high_resolution_clock::now();
+        PM::TransformationParameters T = icp(data, ref);
+        auto stop = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> e = stop - start;
+        icptime += e.count();
+        // Retrieve the ground truth to calculate accuracy
+        std::vector<std::string> parts;
+        boost::split(parts, radar_files[i], boost::is_any_of("."));
+        int64 time1 = std::stoll(parts[0]);
+        boost::split(parts, radar_files[i + 1], boost::is_any_of("."));
+        int64 time2 = std::stoll(parts[0]);
+        std::vector<float> gtvec;
+        get_groundtruth_odometry(gt, time1, time2, gtvec);
 
-    std::cout << "Ground truth: " << r2 << std::endl;
+        float yaw = -1 * asin(T(0, 1));
+
+        ofs << T(0, 2) << "," << T(1, 2) << "," << yaw << ",";
+        ofs << gtvec[0] << "," << gtvec[1] << "," << gtvec[5] << ",";
+        ofs << time1 << "," << time2 << "\n";
+    }
+
+    icptime /= (radar_files.size() - 1);
+    std::cout << "average ICP time: " << icptime << std::endl;
 
     return 0;
 }

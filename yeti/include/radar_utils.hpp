@@ -66,3 +66,12 @@ void convert_to_bev(Eigen::MatrixXf cart_points, float cart_resolution, int cart
 */
 void draw_points(cv::Mat cart_img, Eigen::MatrixXf cart_targets, float cart_resolution, int cart_pixel_width,
     cv::Mat &vis);
+
+/*!
+   \brief Retrieves the ground truth odometry between radar timestamps t1 and t2
+   \param gtfile (absolute) file location of the radar_odometry.csv file
+   \param t1
+   \param t2
+   \param gt [out] Vector of floats for the ground truth transform between radar timestamp t1 and t2 (x, y, z, r, p, y)
+*/
+void get_groundtruth_odometry(std::string gtfile, int64 t1, int64 t2, std::vector<float> &gt);

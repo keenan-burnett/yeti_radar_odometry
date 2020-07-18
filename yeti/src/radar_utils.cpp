@@ -2,6 +2,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <fstream>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include "radar_utils.hpp"
@@ -139,5 +140,22 @@ void draw_points(cv::Mat cart_img, Eigen::MatrixXf cart_targets, float cart_reso
     cv::cvtColor(cart_img, vis, cv::COLOR_GRAY2BGR);
     for (cv::Point p : bev_points) {
         cv::circle(vis, p, 1, cv::Scalar(0, 0, 255), -1);
+    }
+}
+
+void get_groundtruth_odometry(std::string gtfile, int64 t1, int64 t2, std::vector<float> &gt) {
+    std::ifstream ifs(gtfile);
+    std::string line;
+    std::getline(ifs, line);
+    gt.clear();
+    while (std::getline(ifs, line)) {
+        std::vector<std::string> parts;
+        boost::split(parts, line, boost::is_any_of(","));
+        if (std::stoll(parts[9]) == t1 && std::stoll(parts[8]) == t2) {
+            for (int i = 2; i < 8; ++i) {
+                gt.push_back(std::stof(parts[i]));
+            }
+            break;
+        }
     }
 }
