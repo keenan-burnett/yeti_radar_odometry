@@ -34,13 +34,13 @@ int main() {
     // int window_size = 128;
     // float scale = 3.5;
     // int guard_cells = 32;
-    // cfar1d(fft_data, window_size, scale, guard_cells, targets);
+    // cfar1d(fft_data, window_size, scale, guard_cells, min_range, targets);
 
     // float zq = 2.5;
     // int sigma_gauss = 17;
     // cen2018features(fft_data, zq, sigma_gauss, min_range, targets);
 
-    int max_points = 10000;
+    int max_points = 20000;
     cen2019features(fft_data, max_points, min_range, targets);
 
     std::cout << "targets: " << targets.cols() << std::endl;

@@ -51,6 +51,15 @@ target_link_libraries(radar_utils
 	${Boost_INCLUDE_DIRS}
 )
 
+add_library(association
+  src/association.cpp
+)
+
+target_link_libraries(association
+	${catkin_LIBRARIES}
+	${Boost_INCLUDE_DIRS}
+)
+
 add_executable(visualization src/visualization.cpp)
 target_link_libraries(visualization
     features
@@ -80,6 +89,25 @@ add_executable(scan_matching_test src/test_scan_matching.cpp)
 target_link_libraries(scan_matching_test
     features
     radar_utils
+	${catkin_LIBRARIES}
+	${OpenCV_LIBRARIES}
+    ${libpointmatcher_LIBRARIES}
+)
+
+add_executable(build_map src/build_map.cpp)
+target_link_libraries(build_map
+    features
+    radar_utils
+	${catkin_LIBRARIES}
+	${OpenCV_LIBRARIES}
+    ${libpointmatcher_LIBRARIES}
+)
+
+add_executable(test_association src/test_association.cpp)
+target_link_libraries(test_association
+    features
+    radar_utils
+    association
 	${catkin_LIBRARIES}
 	${OpenCV_LIBRARIES}
     ${libpointmatcher_LIBRARIES}

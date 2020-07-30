@@ -10,7 +10,7 @@ matcher:
 
 outlierFilters:
   - TrimmedDistOutlierFilter:
-      ratio: 0.90
+      ratio: 0.80
 
 errorMinimizer:
   PointToPointErrorMinimizer
@@ -27,4 +27,4 @@ inspector:
   NullInspector
 
 logger:
-  FileLogger
+  NullLogger

@@ -1,6 +1,6 @@
+#include <Eigen/Dense>
 #include <chrono>
 #include <iostream>
-#include <Eigen/Dense>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
@@ -9,6 +9,7 @@
 void cfar1d(cv::Mat fft_data, int window_size, float scale, int guard_cells, int min_range, Eigen::MatrixXf &targets) {
     assert(fft_data.depth() == CV_32F);
     assert(fft_data.channels() == 1);
+    auto t1 = std::chrono::high_resolution_clock::now();
     int kernel_size = window_size + guard_cells * 2 + 1;
     cv::Mat kernel = cv::Mat::ones(1, kernel_size, CV_32F) * -1 * scale / window_size;
     kernel.at<float>(0, kernel_size / 2) = 1;
@@ -34,6 +35,9 @@ void cfar1d(cv::Mat fft_data, int window_size, float scale, int guard_cells, int
         targets(0, i) = t[i].x;
         targets(1, i) = t[i].y;
     }
+    auto t2 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> e = t2 - t1;
+    std::cout << "feature extraction: " << e.count() << std::endl;
 }
 
 // Runtime: 0.038s
