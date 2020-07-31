@@ -120,7 +120,7 @@ void polar_to_cartesian_points(std::vector<float> azimuths, Eigen::MatrixXf pola
 }
 
 void convert_to_bev(Eigen::MatrixXf cart_points, float cart_resolution, int cart_pixel_width,
-    std::vector<cv::Point> &bev_points) {
+    std::vector<cv::Point2f> &bev_points) {
     float cart_min_range = (cart_pixel_width / 2) * cart_resolution;
     if (cart_pixel_width % 2 == 0)
         cart_min_range = (cart_pixel_width / 2 - 0.5) * cart_resolution;
@@ -129,16 +129,16 @@ void convert_to_bev(Eigen::MatrixXf cart_points, float cart_resolution, int cart
         int u = (cart_min_range + cart_points(1, i)) / cart_resolution;
         int v = (cart_min_range - cart_points(0, i)) / cart_resolution;
         if (0 < u && u < cart_pixel_width && 0 < v && v < cart_pixel_width)
-            bev_points.push_back(cv::Point(u, v));
+            bev_points.push_back(cv::Point2f(u, v));
     }
 }
 
 void draw_points(cv::Mat cart_img, Eigen::MatrixXf cart_targets, float cart_resolution, int cart_pixel_width,
     cv::Mat &vis) {
-    std::vector<cv::Point> bev_points;
+    std::vector<cv::Point2f> bev_points;
     convert_to_bev(cart_targets, cart_resolution, cart_pixel_width, bev_points);
     cv::cvtColor(cart_img, vis, cv::COLOR_GRAY2BGR);
-    for (cv::Point p : bev_points) {
+    for (cv::Point2f p : bev_points) {
         cv::circle(vis, p, 1, cv::Scalar(0, 0, 255), -1);
     }
 }

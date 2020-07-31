@@ -105,10 +105,16 @@ target_link_libraries(build_map
 
 add_executable(test_association src/test_association.cpp)
 target_link_libraries(test_association
+    association
+	${catkin_LIBRARIES}
+	${OpenCV_LIBRARIES}
+)
+
+add_executable(test_feature_matching src/test_feature_matching.cpp)
+target_link_libraries(test_feature_matching
     features
     radar_utils
     association
 	${catkin_LIBRARIES}
 	${OpenCV_LIBRARIES}
-    ${libpointmatcher_LIBRARIES}
 )

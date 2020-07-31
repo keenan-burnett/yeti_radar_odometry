@@ -16,10 +16,8 @@ int main(int argc, char *argv[]) {
     std::string datadir = "/home/keenan/Documents/data/2019-01-10-14-36-48-radar-oxford-10k-partial/radar";
     std::string gt = "/home/keenan/Documents/data/2019-01-10-14-36-48-radar-oxford-10k-partial/gt/radar_odometry.csv";
     std::string config = "/home/keenan/radar_ws/src/yeti/yeti/config/icp.yaml";
-    float cart_resolution = 0.25;
-    int cart_pixel_width = 1000;
     int min_range = 58;
-    int max_points = 10000;
+    // int max_points = 10000;
     float zq = 3.0;
     int sigma_gauss = 17;
     // int window_size = 128;
@@ -60,7 +58,7 @@ int main(int argc, char *argv[]) {
     labels.push_back(DP::Label("w", 1));
 
     DP ref, data;
-    double icptime;
+    double icptime = 0;
 
     for (uint i = 0; i < radar_files.size() - 1; ++i) {
         if (i == 0) {

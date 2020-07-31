@@ -22,7 +22,7 @@ int main() {
     std::vector<bool> valid;
     cv::Mat fft_data;
 
-    load_radar(datadir + "/" + radar_files[100], timestamps, azimuths, valid, fft_data);
+    load_radar(datadir + "/" + radar_files[0], timestamps, azimuths, valid, fft_data);
 
     cv::Mat cart_img;
     radar_polar_to_cartesian(azimuths, fft_data, radar_resolution, cart_resolution, cart_pixel_width,

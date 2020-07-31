@@ -54,7 +54,7 @@ void polar_to_cartesian_points(std::vector<float> azimuths, Eigen::MatrixXf pola
    \param bev_points [out] Vector of pixel locations in the BEV cartesian image (u, v)
 */
 void convert_to_bev(Eigen::MatrixXf cart_points, float cart_resolution, int cart_pixel_width,
-    std::vector<cv::Point> &bev_points);
+    std::vector<cv::Point2f> &bev_points);
 
 /*!
    \brief Draws a red dot for each feature on the top-down cartesian view of the radar image

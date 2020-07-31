@@ -18,10 +18,8 @@ int main(int argc, char *argv[]) {
     std::string gt = "/home/keenan/Documents/data/2019-01-10-14-36-48-radar-oxford-10k-partial/gt/radar_odometry.csv";
     std::string config = "/home/keenan/radar_ws/src/yeti/yeti/config/icp.yaml";
     std::string map_name = "map.vtk";
-    float cart_resolution = 0.25;
-    int cart_pixel_width = 1000;
     int min_range = 58;
-    int max_points = 10000;
+    // int max_points = 10000;
     float zq = 4.0;
     int sigma_gauss = 17;
 
@@ -62,7 +60,7 @@ int main(int argc, char *argv[]) {
         PM::get().DataPointsFilterRegistrar.create("OctreeGridDataPointsFilter", {{"maxSizeByNode", "0.25"}, {"samplingMethod", "1"}});  // NOLINT
 
     DP map, newCloud, ref, transformed;
-    double icptime;
+    double icptime = 0;
     // Rigid transformation
     std::shared_ptr<PM::Transformation> rigidTrans;
     rigidTrans = PM::get().REG(Transformation).create("RigidTransformation");
