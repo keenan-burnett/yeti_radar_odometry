@@ -33,7 +33,7 @@ void load_radar(std::string path, std::vector<int64_t> &timestamps, std::vector<
    \param interpolate_crossover If true, interpolates between the end and start azimuth of the scan.
    \param cart_img [out] Cartesian radar power readings
 */
-void radar_polar_to_cartesian(std::vector<float> azimuths, cv::Mat fft_data, float radar_resolution,
+void radar_polar_to_cartesian(std::vector<float> &azimuths, cv::Mat &fft_data, float radar_resolution,
     float cart_resolution, int cart_pixel_width, bool interpolate_crossover, cv::Mat &cart_img);
 
 /*!

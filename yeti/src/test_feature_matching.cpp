@@ -10,7 +10,6 @@
 #include "features.hpp"
 #include "association.hpp"
 
-
 int main(int argc, char *argv[]) {
     std::string datadir = "/home/keenan/Documents/data/2019-01-10-14-36-48-radar-oxford-10k-partial/radar";
     std::string gt = "/home/keenan/Documents/data/2019-01-10-14-36-48-radar-oxford-10k-partial/gt/radar_odometry.csv";
@@ -34,7 +33,8 @@ int main(int argc, char *argv[]) {
     // Create ORB feature detector
     cv::Ptr<cv::ORB> detector = cv::ORB::create();
     detector->setPatchSize(patch_size);
-    cv::FlannBasedMatcher matcher = cv::FlannBasedMatcher(cv::makePtr<cv::flann::LshIndexParams>(12, 20, 2));
+    // cv::FlannBasedMatcher matcher = cv::FlannBasedMatcher(cv::makePtr<cv::flann::LshIndexParams>(12, 20, 2));
+    cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
 
     cv::Mat img1, img2, desc1, desc2;
     std::vector<cv::KeyPoint> kp1, kp2;
@@ -73,10 +73,11 @@ int main(int argc, char *argv[]) {
             t1 = t2; a1 = a2; v1 = v2; f1 = f2; kp1 = kp2;
             desc1 = desc2.clone(); img2.copyTo(img1);
         }
-
         load_radar(datadir + "/" + radar_files[i + 1], t2, a2, v2, f2);
         Eigen::MatrixXf targets2;
         cen2018features(f2, zq, sigma_gauss, min_range, targets2);
+
+        auto start = std::chrono::high_resolution_clock::now();
         Eigen::MatrixXf cart_targets;
         polar_to_cartesian_points(a2, targets2, radar_resolution, cart_targets);
         std::vector<cv::Point2f> bev_points;
@@ -90,11 +91,17 @@ int main(int argc, char *argv[]) {
         cv::minMaxLoc(img2, &min, &max);
         img2.convertTo(img2, CV_8UC1, 255.0 / max);
         detector->compute(img2, kp2, desc2);
+        auto stop = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> e = stop - start;
+        std::cout << "extract keypoints: " << e.count() << std::endl;
 
-        auto start = std::chrono::high_resolution_clock::now();
+        start = std::chrono::high_resolution_clock::now();
         // Match keypoint descriptors using FLANN
         std::vector<std::vector<cv::DMatch>> knn_matches;
-        matcher.knnMatch(desc1, desc2, knn_matches, 2);
+        matcher->knnMatch(desc1, desc2, knn_matches, 2);
+        stop = std::chrono::high_resolution_clock::now();
+        e = stop - start;
+        std::cout << "feature matching: " << e.count() << std::endl;
         // Filter matches using nearest neighbor distance ratio (Szeliski)
         const float ratio = 0.7;
         std::vector<cv::DMatch> good_matches;
@@ -117,15 +124,18 @@ int main(int argc, char *argv[]) {
         Eigen::MatrixXf p1cart, p2cart;
         convert_bev_to_polar(p1, cart_resolution, cart_pixel_width, p1cart);
         convert_bev_to_polar(p2, cart_resolution, cart_pixel_width, p2cart);
+
+
         // Compute the transformation using RANSAC
+        start = std::chrono::high_resolution_clock::now();
         Ransac<float> ransac(p2cart, p1cart, 0.35, 0.90, 100);
         ransac.computeModel();
         Eigen::MatrixXf T;
         ransac.getTransform(T);
 
-        auto stop = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> e = stop - start;
-        ransactime += e.count();
+        stop = std::chrono::high_resolution_clock::now();
+        e = stop - start;
+        std::cout << "ransac: " << e.count() << std::endl;
         // Retrieve the ground truth to calculate accuracy
         std::vector<std::string> parts;
         boost::split(parts, radar_files[i], boost::is_any_of("."));
@@ -147,7 +157,7 @@ int main(int argc, char *argv[]) {
         // cv::waitKey(0);
     }
 
-    std::cout << "average ransac time: " << ransactime / float(radar_files.size()) << std::endl;
+    // std::cout << "average ransac time: " << ransactime / float(radar_files.size()) << std::endl;
 
     return 0;
 }

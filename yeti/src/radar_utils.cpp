@@ -55,7 +55,7 @@ void load_radar(std::string path, std::vector<int64_t> &timestamps, std::vector<
     }
 }
 
-void radar_polar_to_cartesian(std::vector<float> azimuths, cv::Mat fft_data, float radar_resolution,
+void radar_polar_to_cartesian(std::vector<float> &azimuths, cv::Mat &fft_data, float radar_resolution,
     float cart_resolution, int cart_pixel_width, bool interpolate_crossover, cv::Mat &cart_img) {
 
     float cart_min_range = (cart_pixel_width / 2) * cart_resolution;
@@ -64,22 +64,27 @@ void radar_polar_to_cartesian(std::vector<float> azimuths, cv::Mat fft_data, flo
 
     cv::Mat map_x = cv::Mat::zeros(cart_pixel_width, cart_pixel_width, CV_32F);
     cv::Mat map_y = cv::Mat::zeros(cart_pixel_width, cart_pixel_width, CV_32F);
+
+#pragma omp parallel for collapse(2)
     for (int j = 0; j < map_y.cols; ++j) {
-        float m = -1 * cart_min_range + j * cart_resolution;
+        // float m = -1 * cart_min_range + j * cart_resolution;
         for (int i = 0; i < map_y.rows; ++i) {
-            map_y.at<float>(i, j) = m;
+            map_y.at<float>(i, j) = -1 * cart_min_range + j * cart_resolution;
+            // map_y.at<float>(i, j) = m;
         }
     }
+#pragma omp parallel for collapse(2)
     for (int i = 0; i < map_x.rows; ++i) {
-        float m = cart_min_range - i * cart_resolution;
+        // float m = cart_min_range - i * cart_resolution;
         for (int j = 0; j < map_x.cols; ++j) {
-            map_x.at<float>(i, j) = m;
+            map_x.at<float>(i, j) = cart_min_range - i * cart_resolution;
         }
     }
     cv::Mat range = cv::Mat::zeros(cart_pixel_width, cart_pixel_width, CV_32F);
     cv::Mat angle = cv::Mat::zeros(cart_pixel_width, cart_pixel_width, CV_32F);
 
     float azimuth_step = azimuths[1] - azimuths[0];
+#pragma omp parallel for collapse(2)
     for (int i = 0; i < range.rows; ++i) {
         for (int j = 0; j < range.cols; ++j) {
             float x = map_x.at<float>(i, j);
