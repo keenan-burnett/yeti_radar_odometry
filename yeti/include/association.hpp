@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <Eigen/Dense>
 #include <iostream>
+#include <vector>
 
 /*!
    \brief Enforce orthogonality conditions on the given rotation matrix such that det(R) == 1 and R.tranpose() * R = I
@@ -75,16 +76,12 @@ void get_rigid_transform(Eigen::Matrix<T, -1, -1> p1, Eigen::Matrix<T, -1, -1> p
     Eigen::Matrix<T, -1, -1> U = svd.matrixU();
     Eigen::Matrix<T, -1, -1> V = svd.matrixV();
     Eigen::Matrix<T, -1, -1> R_hat = V * U.transpose();
-    std::cout << R_hat << std::endl;
-    std::cout << R_hat.determinant() << std::endl;
     if (R_hat.determinant() < 0) {
         V.block(0, dim - 1, dim, 1) = -1 * V.block(0, dim - 1, dim, 1);
         R_hat = V * U.transpose();
     }
     if (R_hat.determinant() != 1.0)
         enforce_orthogonality(R_hat);
-    std::cout << R_hat << std::endl;
-    std::cout << R_hat.determinant() << std::endl;
     // Calculate translation
     Eigen::Matrix<T, -1, -1> t = mu2 - R_hat * mu1;
     // Create the output transformation
@@ -92,3 +89,107 @@ void get_rigid_transform(Eigen::Matrix<T, -1, -1> p1, Eigen::Matrix<T, -1, -1> p
     Tf.block(0, 0, dim, dim) = R_hat;
     Tf.block(0, dim, dim, 1) = t;
 }
+
+/*!
+   \brief Returns a random subset of indices, where 0 <= indices[i] <= max_index. indices are non-repeating.
+*/
+static std::vector<int> random_subset(int max_index, int subset_size) {
+    std::vector<int> subset;
+    if (max_index < 0 || subset_size < 0)
+        return subset;
+    if (max_index < subset_size)
+        subset_size = max_index;
+    subset = std::vector<int>(subset_size, -1);
+    for (uint i = 0; i < subset.size(); i++) {
+        while (subset[i] < 0) {
+            int idx = std::rand() % max_index;
+            if (std::find(subset.begin(), subset.begin() + i, idx) == subset.begin() + i)
+                subset[i] = idx;
+        }
+    }
+    return subset;
+}
+
+template<class T>
+class Ransac {
+public:
+    // p1, p2 need to be either (x, y) x N or (x, y, z) x N (must be in homogeneous coordinates)
+    Ransac(Eigen::Matrix<T, -1, -1> p1_, Eigen::Matrix<T, -1, -1> p2_, float tolerance_, float inlier_ratio_,
+        int iterations_) : p1(p1_), p2(p2_), tolerance(tolerance_), inlier_ratio(inlier_ratio_),
+        iterations(iterations_) {
+        assert(p1.cols() == p2.cols());
+        assert(p1.rows() == p2.rows());
+        int dim = p1.rows();
+        assert(dim == 2 || dim == 3);
+        T_best = Eigen::Matrix<T, -1, -1>::Identity(dim + 1, dim + 1);
+    }
+    void setTolerance(float tolerance_) {tolerance = tolerance_;}
+    void setInlierRatio(float inlier_ratio_) {inlier_ratio = inlier_ratio_;}
+    void setMaxIterations(int iterations_) {iterations = iterations_;}
+    void getTransform(Eigen::Matrix<T, -1, -1> &Tf) {Tf = T_best;}
+
+    int computeModel() {
+        uint max_inliers = 0;
+        std::vector<int> best_inliers;
+        int dim = p1.rows();
+        int subset_size = 2;
+        int i = 0;
+        for (i = 0; i < iterations; ++i) {
+            std::vector<int> subset = random_subset(p1.cols(), subset_size);
+            if ((int)subset.size() < subset_size)
+                continue;
+            // Compute transform from the random sample
+            Eigen::Matrix<T, -1, -1> p1small, p2small;
+            p1small = Eigen::Matrix<T, -1, -1>::Zero(dim, subset_size);
+            p2small = p1small;
+            for (int j = 0; j < subset_size; ++j) {
+                p1small.block(0, j, dim, 1) = p1.block(0, subset[j], dim, 1);
+                p2small.block(0, j, dim, 1) = p2.block(0, subset[j], dim, 1);
+            }
+            Eigen::Matrix<T, -1, -1> T_current;
+            get_rigid_transform(p1small, p2small, T_current);
+            // Check the number of inliers
+            std::vector<int> inliers;
+            getInliers(T_current, inliers);
+            if (inliers.size() > max_inliers) {
+                best_inliers = inliers;
+                max_inliers = inliers.size();
+            }
+            if (float(inliers.size()) / float(p1.cols()) > inlier_ratio)
+                break;
+        }
+        // Refine transformation using the inlier set
+        Eigen::Matrix<T, -1, -1> p1small, p2small;
+        p1small = Eigen::Matrix<T, -1, -1>::Zero(dim, best_inliers.size());
+        p2small = p1small;
+        for (int j = 0; j < best_inliers.size(); ++j) {
+            p1small.block(0, j, dim, 1) = p1.block(0, best_inliers[j], dim, 1);
+            p2small.block(0, j, dim, 1) = p2.block(0, best_inliers[j], dim, 1);
+        }
+        get_rigid_transform(p1small, p2small, T_best);
+        // std::cout << "iterations: " << i << std::endl;
+        // std::cout << "inlier ratio: " << float(max_inliers) / float(p1.cols()) << std::endl;
+        return max_inliers;
+    }
+
+private:
+    Eigen::Matrix<T, -1, -1> p1, p2;
+    float tolerance = 0.05;
+    float inlier_ratio = 0.9;
+    int iterations = 40;
+    Eigen::Matrix<T, -1, -1> T_best;
+    float colinear_angle_threshold = 0.996;
+
+    void getInliers(Eigen::Matrix<T, -1, -1> Tf, std::vector<int> &inliers) {
+        int dim = p1.rows();
+        Eigen::Matrix<T, -1, -1> p1_prime = Eigen::Matrix<T, -1, -1>::Ones(dim + 1, p1.cols());
+        p1_prime.block(0, 0, dim, p1.cols()) = p1;
+        p1_prime = Tf * p1_prime;
+        inliers.clear();
+        for (uint i = 0; i < p1_prime.cols(); ++i) {
+            auto distance = (p1_prime.block(0, i, dim, 1) - p2.block(0, i, dim, 1)).norm();
+            if (distance < tolerance)
+                inliers.push_back(i);
+        }
+    }
+};

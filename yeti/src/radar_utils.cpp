@@ -126,10 +126,22 @@ void convert_to_bev(Eigen::MatrixXf cart_points, float cart_resolution, int cart
         cart_min_range = (cart_pixel_width / 2 - 0.5) * cart_resolution;
     bev_points.clear();
     for (uint i = 0; i < cart_points.cols(); ++i) {
-        int u = (cart_min_range + cart_points(1, i)) / cart_resolution;
-        int v = (cart_min_range - cart_points(0, i)) / cart_resolution;
+        float u = (cart_min_range + cart_points(1, i)) / cart_resolution;
+        float v = (cart_min_range - cart_points(0, i)) / cart_resolution;
         if (0 < u && u < cart_pixel_width && 0 < v && v < cart_pixel_width)
             bev_points.push_back(cv::Point2f(u, v));
+    }
+}
+
+void convert_bev_to_polar(Eigen::MatrixXf bev_points, float cart_resolution, int cart_pixel_width,
+    Eigen::MatrixXf &cart_points) {
+    cart_points = Eigen::MatrixXf::Zero(2, bev_points.cols());
+    float cart_min_range = (cart_pixel_width / 2) * cart_resolution;
+    if (cart_pixel_width % 2 == 0)
+        cart_min_range = (cart_pixel_width / 2 - 0.5) * cart_resolution;
+    for (uint i = 0; i < bev_points.cols(); ++i) {
+        cart_points(0, i) = cart_min_range - cart_resolution * bev_points(1, i);
+        cart_points(1, i) = cart_resolution * bev_points(0, i) - cart_min_range;
     }
 }
 
