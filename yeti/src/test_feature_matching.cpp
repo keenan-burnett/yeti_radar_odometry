@@ -105,10 +105,6 @@ int main(int argc, char *argv[]) {
                 good_matches.push_back(knn_matches[j][0]);
             }
         }
-        cv::Mat img_matches;
-        cv::drawMatches(img1, kp1, img2, kp2, good_matches, img_matches, cv::Scalar::all(-1),
-                 cv::Scalar::all(-1), std::vector<char>());
-
         // Convert the good key point matches to Eigen matrices
         Eigen::MatrixXf p1 = Eigen::MatrixXf::Zero(2, good_matches.size());
         Eigen::MatrixXf p2 = p1;
@@ -143,6 +139,12 @@ int main(int argc, char *argv[]) {
         ofs << T(0, 2) << "," << T(1, 2) << "," << yaw << ",";
         ofs << gtvec[0] << "," << gtvec[1] << "," << gtvec[5] << ",";
         ofs << time1 << "," << time2 << "\n";
+
+        // cv::Mat img_matches;
+        // cv::drawMatches(img1, kp1, img2, kp2, good_matches, img_matches, cv::Scalar::all(-1),
+        //          cv::Scalar::all(-1), std::vector<char>());
+        // cv::imshow("good", img_matches);
+        // cv::waitKey(0);
     }
 
     std::cout << "average ransac time: " << ransactime / float(radar_files.size()) << std::endl;
