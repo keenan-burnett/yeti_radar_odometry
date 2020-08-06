@@ -11,8 +11,8 @@
 #include "association.hpp"
 
 int main(int argc, char *argv[]) {
-    std::string datadir = "/home/keenan/Documents/data/2019-01-10-14-36-48-radar-oxford-10k-partial/radar";
-    std::string gt = "/home/keenan/Documents/data/2019-01-10-14-36-48-radar-oxford-10k-partial/gt/radar_odometry.csv";
+    std::string datadir = "/home/keenan/Documents/data/2019-01-10-11-46-21-radar-oxford-10k/radar";
+    std::string gt = "/home/keenan/Documents/data/2019-01-10-11-46-21-radar-oxford-10k/gt/radar_odometry.csv";
     float cart_resolution = 0.25;
     int cart_pixel_width = 1000;
     int min_range = 58;
