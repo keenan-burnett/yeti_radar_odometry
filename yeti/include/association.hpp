@@ -178,7 +178,6 @@ private:
     float inlier_ratio = 0.9;
     int iterations = 40;
     Eigen::Matrix<T, -1, -1> T_best;
-    float colinear_angle_threshold = 0.996;
 
     void getInliers(Eigen::Matrix<T, -1, -1> Tf, std::vector<int> &inliers) {
         int dim = p1.rows();
@@ -193,3 +192,52 @@ private:
         }
     }
 };
+
+Eigen::Matrix3f cross(Eigen::Vector3f x);
+
+void se3ToSE3(Eigen::MatrixXf phi, Eigen::Matrix4f &T);
+
+
+
+class MotionDistortedRansac {
+public:
+    MotionDistortedRansac(Eigen::MatrixXf p1_, Eigen::MatrixXf p2_, float tolerance_, float inlier_ratio_,
+        int iterations_) : tolerance(tolerance_), inlier_ratio(inlier_ratio_),
+        iterations(iterations_) {
+        assert(p1.cols() == p2.cols());
+        assert(p1.rows() == p2.rows());
+        dim = p1.rows();
+        assert(p1.cols() >= p1.row());
+        assert(dim == 2 || dim == 3);
+        T_best = Eigen::MatrixXf::Identity(dim + 1, dim + 1);
+        p1bar = Eigen::MatrixXf::Zero(4, p1.cols());
+        p2bar = Eigen::MatrixXf::Zero(4, p2.cols());
+        p1bar.block(3, 0, 1, p1.cols()) = 1;
+        p2bar.block(3, 0, 1, p2.cols()) = 1;
+        if (dim == 2) {
+            p1bar.block(0, 0, 2, p1.cols()) = p1;
+            p2bar.block(0, 0, 2, p2.cols()) = p2;
+        } else if (dim == 3) {
+            p1bar.block(0, 0, 3, p1.cols()) = p1;
+            p2bar.block(0, 0, 3, p2.cols()) = p2;
+        }
+    }
+    void setTolerance(float tolerance_) {tolerance = tolerance_;}
+    void setInlierRatio(float inlier_ratio_) {inlier_ratio = inlier_ratio_;}
+    void setMaxIterations(int iterations_) {iterations = iterations_;}
+    void getTransform(Eigen::MatrixXf &Tf) {Tf = T_best;}
+    void computeModel();
+
+private:
+    Eigen::MatrixXf p1bar, p2bar;
+    float tolerance = 0.05;
+    float inlier_ratio = 0.9;
+    int iterations = 40;
+    int max_gn_iterations = 10;
+    int dim = 2;
+    Eigen::MatrixXf T_best;
+    Eigen::MatrixXf w_best;
+    float colinear_angle_threshold = 0.996;
+    void getInliers(Eigen::Matrix wbar, std::vector<int> &inliers);
+    get_motion_parameters(Eigen::MatrixXf p1small, Eigen::MatrixXf p2small, Eigen::VectorXf &wbar);
+}

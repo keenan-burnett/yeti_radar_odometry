@@ -133,6 +133,8 @@ int main(int argc, char *argv[]) {
         Eigen::MatrixXf T;
         ransac.getTransform(T);
 
+        // Compute the transformation using motion-distorted RANSAC
+
         stop = std::chrono::high_resolution_clock::now();
         e = stop - start;
         std::cout << "ransac: " << e.count() << std::endl;
