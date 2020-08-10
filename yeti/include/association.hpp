@@ -162,7 +162,7 @@ public:
         Eigen::Matrix<T, -1, -1> p1small, p2small;
         p1small = Eigen::Matrix<T, -1, -1>::Zero(dim, best_inliers.size());
         p2small = p1small;
-        for (int j = 0; j < best_inliers.size(); ++j) {
+        for (uint j = 0; j < best_inliers.size(); ++j) {
             p1small.block(0, j, dim, 1) = p1.block(0, best_inliers[j], dim, 1);
             p2small.block(0, j, dim, 1) = p2.block(0, best_inliers[j], dim, 1);
         }
@@ -193,27 +193,29 @@ private:
     }
 };
 
-Eigen::Matrix3f cross(Eigen::Vector3f x);
+Eigen::MatrixXf cross(Eigen::VectorXf x);
 
-void se3ToSE3(Eigen::MatrixXf phi, Eigen::Matrix4f &T);
+Eigen::MatrixXf circledot(Eigen::VectorXf x);
 
+Eigen::Matrix4f se3ToSE3(Eigen::MatrixXf xi);
 
 
 class MotionDistortedRansac {
 public:
-    MotionDistortedRansac(Eigen::MatrixXf p1_, Eigen::MatrixXf p2_, float tolerance_, float inlier_ratio_,
-        int iterations_) : tolerance(tolerance_), inlier_ratio(inlier_ratio_),
+    MotionDistortedRansac(Eigen::MatrixXf p1, Eigen::MatrixXf p2, std::vector<float> a1_, std::vector<float> a2_,
+        std::vector<int64_t> t1_, std::vector<int64_t> t2_, float tolerance_, float inlier_ratio_, int iterations_) :
+        a1(a1_), a2(a2_), t1(t1_), t2(t2_), tolerance(tolerance_), inlier_ratio(inlier_ratio_),
         iterations(iterations_) {
         assert(p1.cols() == p2.cols());
         assert(p1.rows() == p2.rows());
+        assert(p1.cols() >= p1.rows());
         dim = p1.rows();
-        assert(p1.cols() >= p1.row());
         assert(dim == 2 || dim == 3);
         T_best = Eigen::MatrixXf::Identity(dim + 1, dim + 1);
         p1bar = Eigen::MatrixXf::Zero(4, p1.cols());
         p2bar = Eigen::MatrixXf::Zero(4, p2.cols());
-        p1bar.block(3, 0, 1, p1.cols()) = 1;
-        p2bar.block(3, 0, 1, p2.cols()) = 1;
+        p1bar.block(3, 0, 1, p1.cols()) = Eigen::MatrixXf::Ones(1, p1.cols());
+        p2bar.block(3, 0, 1, p2.cols()) = Eigen::MatrixXf::Ones(1, p2.cols());
         if (dim == 2) {
             p1bar.block(0, 0, 2, p1.cols()) = p1;
             p2bar.block(0, 0, 2, p2.cols()) = p2;
@@ -221,23 +223,31 @@ public:
             p1bar.block(0, 0, 3, p1.cols()) = p1;
             p2bar.block(0, 0, 3, p2.cols()) = p2;
         }
+        R_pol << pow(0.25, 2), 0, 0, 0, 0, pow(0.0157, 2), 0, 0, 0, 0, 1, 0, 0, 0, 0, 1;
     }
     void setTolerance(float tolerance_) {tolerance = tolerance_;}
     void setInlierRatio(float inlier_ratio_) {inlier_ratio = inlier_ratio_;}
     void setMaxIterations(int iterations_) {iterations = iterations_;}
     void getTransform(Eigen::MatrixXf &Tf) {Tf = T_best;}
-    void computeModel();
+    int computeModel();
 
 private:
     Eigen::MatrixXf p1bar, p2bar;
+    std::vector<float> a1, a2;
+    std::vector<int64_t> t1, t2;
     float tolerance = 0.05;
     float inlier_ratio = 0.9;
     int iterations = 40;
     int max_gn_iterations = 10;
     int dim = 2;
-    Eigen::MatrixXf T_best;
-    Eigen::MatrixXf w_best;
-    float colinear_angle_threshold = 0.996;
-    void getInliers(Eigen::Matrix wbar, std::vector<int> &inliers);
-    get_motion_parameters(Eigen::MatrixXf p1small, Eigen::MatrixXf p2small, Eigen::VectorXf &wbar);
-}
+    Eigen::Matrix4f T_best = Eigen::Matrix4f::Identity();
+    Eigen::VectorXf w_best = Eigen::VectorXf::Zero(6);
+    Eigen::Matrix4f R_pol = Eigen::Matrix4f::Identity();
+    Eigen::MatrixXf get_jacobian(Eigen::Vector3f gbar);
+    Eigen::MatrixXf get_inv_jacobian(Eigen::Vector3f gbar);
+    Eigen::VectorXf to_cylindrical(Eigen::VectorXf gbar);
+    Eigen::VectorXf from_cylindrical(Eigen::VectorXf ybar);
+    float get_delta_t(Eigen::VectorXf y2, Eigen::VectorXf y1);
+    void get_motion_parameters(Eigen::MatrixXf &p1small, Eigen::MatrixXf &p2small, Eigen::VectorXf &wbar);
+    void getInliers(Eigen::VectorXf wbar, std::vector<int> &inliers);
+};
