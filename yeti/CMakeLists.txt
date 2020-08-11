@@ -23,8 +23,11 @@ find_package(PkgConfig)
 
 find_package(libpointmatcher REQUIRED)
 
+find_package(PythonLibs REQUIRED)
+
 include_directories(
 	include
+    third_party/matplotlib-cpp
 	${catkin_INCLUDE_DIRS}
 	${OpenCV_INCLUDE_DIRS}
 	${Boost_INCLUDE_DIRS}
@@ -118,3 +121,20 @@ target_link_libraries(test_feature_matching
 	${catkin_LIBRARIES}
 	${OpenCV_LIBRARIES}
 )
+
+
+add_library(matplotlibcpp INTERFACE)
+target_include_directories(matplotlibcpp INTERFACE include)
+target_include_directories(matplotlibcpp INTERFACE ${PYTHON_INCLUDE_DIRS})
+target_link_libraries(matplotlibcpp INTERFACE ${PYTHON_LIBRARIES})
+
+add_executable(test_motiondistortion src/test_motiondistortion.cpp)
+#target_include_directories(test_motiondistortion PRIVATE ${PYTHON_INCLUDE_DIRS})
+target_link_libraries(test_motiondistortion
+    association
+	${catkin_LIBRARIES}
+	${OpenCV_LIBRARIES}
+    # ${PYTHON_LIBRARIES}
+	matplotlibcpp
+)
+target_compile_definitions(test_motiondistortion PRIVATE "-DWITHOUT_NUMPY")
