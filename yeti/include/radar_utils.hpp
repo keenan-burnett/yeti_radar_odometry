@@ -20,7 +20,7 @@ void get_file_names(std::string datadir, std::vector<std::string> &radar_files);
    \param valid [out] Mask of whether azimuth data is an original sensor reasing or interpolated from adjacent azimuths
    \param fft_data [out] Radar power readings along each azimuth
 */
-void load_radar(std::string path, std::vector<int64_t> &timestamps, std::vector<float> &azimuths,
+void load_radar(std::string path, std::vector<int64_t> &timestamps, std::vector<double> &azimuths,
     std::vector<bool> &valid, cv::Mat &fft_data);
 
 /*!
@@ -33,7 +33,7 @@ void load_radar(std::string path, std::vector<int64_t> &timestamps, std::vector<
    \param interpolate_crossover If true, interpolates between the end and start azimuth of the scan.
    \param cart_img [out] Cartesian radar power readings
 */
-void radar_polar_to_cartesian(std::vector<float> &azimuths, cv::Mat &fft_data, float radar_resolution,
+void radar_polar_to_cartesian(std::vector<double> &azimuths, cv::Mat &fft_data, float radar_resolution,
     float cart_resolution, int cart_pixel_width, bool interpolate_crossover, cv::Mat &cart_img);
 
 /*!
@@ -43,7 +43,7 @@ void radar_polar_to_cartesian(std::vector<float> &azimuths, cv::Mat &fft_data, f
    \param radar_resolution Resolution of the polar radar data (metres per pixel)
    \param cart_points [out] Matrix of points in cartesian space (x, y) x N in metric
 */
-void polar_to_cartesian_points(std::vector<float> azimuths, Eigen::MatrixXf polar_points, float radar_resolution,
+void polar_to_cartesian_points(std::vector<double> azimuths, Eigen::MatrixXf polar_points, float radar_resolution,
     Eigen::MatrixXf &cart_points);
 
 /*!

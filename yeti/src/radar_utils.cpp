@@ -34,20 +34,20 @@ void get_file_names(std::string datadir, std::vector<std::string> &radar_files) 
     std::sort(radar_files.begin(), radar_files.end(), less_than_img());
 }
 
-void load_radar(std::string path, std::vector<int64_t> &timestamps, std::vector<float> &azimuths,
+void load_radar(std::string path, std::vector<int64_t> &timestamps, std::vector<double> &azimuths,
     std::vector<bool> &valid, cv::Mat &fft_data) {
     int encoder_size = 5600;
     cv::Mat raw_example_data = cv::imread(path, cv::IMREAD_GRAYSCALE);
     int N = raw_example_data.rows;
     timestamps = std::vector<int64_t>(N, 0);
-    azimuths = std::vector<float>(N, 0);
+    azimuths = std::vector<double>(N, 0);
     valid = std::vector<bool>(N, true);
     int range_bins = 3768;
     fft_data = cv::Mat::zeros(N, range_bins, CV_32F);
     for (int i = 0; i < N; ++i) {
         uchar* byteArray = raw_example_data.ptr<uchar>(i);
         timestamps[i] = *((int64_t *)(byteArray));
-        azimuths[i] = *((uint16_t *)(byteArray + 8)) * 2 * M_PI / float(encoder_size);
+        azimuths[i] = *((uint16_t *)(byteArray + 8)) * 2 * M_PI / double(encoder_size);
         valid[i] = byteArray[10] == 255;
         for (int j = 0; j < range_bins; j++) {
             fft_data.at<float>(i, j) = (float)*(byteArray + 11 + j) / 255.0;
@@ -55,7 +55,7 @@ void load_radar(std::string path, std::vector<int64_t> &timestamps, std::vector<
     }
 }
 
-void radar_polar_to_cartesian(std::vector<float> &azimuths, cv::Mat &fft_data, float radar_resolution,
+void radar_polar_to_cartesian(std::vector<double> &azimuths, cv::Mat &fft_data, float radar_resolution,
     float cart_resolution, int cart_pixel_width, bool interpolate_crossover, cv::Mat &cart_img) {
 
     float cart_min_range = (cart_pixel_width / 2) * cart_resolution;
@@ -83,7 +83,7 @@ void radar_polar_to_cartesian(std::vector<float> &azimuths, cv::Mat &fft_data, f
     cv::Mat range = cv::Mat::zeros(cart_pixel_width, cart_pixel_width, CV_32F);
     cv::Mat angle = cv::Mat::zeros(cart_pixel_width, cart_pixel_width, CV_32F);
 
-    float azimuth_step = azimuths[1] - azimuths[0];
+    double azimuth_step = azimuths[1] - azimuths[0];
 #pragma omp parallel for collapse(2)
     for (int i = 0; i < range.rows; ++i) {
         for (int j = 0; j < range.cols; ++j) {
@@ -113,11 +113,11 @@ void radar_polar_to_cartesian(std::vector<float> &azimuths, cv::Mat &fft_data, f
     cv::remap(fft_data, cart_img, range, angle, cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
 }
 
-void polar_to_cartesian_points(std::vector<float> azimuths, Eigen::MatrixXf polar_points,
+void polar_to_cartesian_points(std::vector<double> azimuths, Eigen::MatrixXf polar_points,
     float radar_resolution, Eigen::MatrixXf &cart_points) {
     cart_points = polar_points;
     for (uint i = 0; i < polar_points.cols(); ++i) {
-        float azimuth = azimuths[polar_points(0, i)];
+        double azimuth = azimuths[polar_points(0, i)];
         float r = polar_points(1, i) * radar_resolution + radar_resolution / 2;
         cart_points(0, i) = r * cos(azimuth);
         cart_points(1, i) = r * sin(azimuth);

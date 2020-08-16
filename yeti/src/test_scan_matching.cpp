@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
 
     float radar_resolution = 0.0432;
     std::vector<int64_t> t1, t2;
-    std::vector<float> a1, a2;
+    std::vector<double> a1, a2;
     std::vector<bool> v1, v2;
     cv::Mat f1, f2;
 

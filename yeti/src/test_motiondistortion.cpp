@@ -2,6 +2,7 @@
 #include <string>
 #include <fstream>
 #include <chrono>
+#include <algorithm>
 #include "matplotlibcpp.h"  // NOLINT
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
@@ -75,6 +76,35 @@ void get_shape(std::vector<double> vertices_x, std::vector<double> vertices_y, s
     }
 }
 
+void get_lines(std::vector<double> vertices_x, std::vector<double> vertices_y, Eigen::MatrixXd &lines) {
+    lines = Eigen::MatrixXd::Zero(7, vertices_x.size());
+    for (uint i = 0; i < vertices_x.size() - 1; ++i) {
+        double x1 = vertices_x[i];
+        double y1 = vertices_y[i];
+        double x2 = vertices_x[i + 1];
+        double y2 = vertices_y[i + 1];
+        double theta = atan2(y2 - y1, x2 - x1);
+        bool flag = 0;
+        double m = 0, b = 0;
+        if ((0 <= theta && theta < M_PI / 4) || (3 * M_PI / 4 <= theta && theta < 5 * M_PI / 4) ||
+            (7 * M_PI / 4 <= theta && theta < 2 * M_PI)) {
+            m = (y2 - y1) / (x2 - x1);  // y = m*x + b
+            b = y1 - m * x1;
+        } else {
+            m = (x2 - x1) / (y2 - y1);  // x = m*y + b
+            b = x1 - m * y1;
+            flag = 1;
+        }
+        lines(0, i) = flag;
+        lines(1, i) = m;
+        lines(2, i) = b;
+        lines(3, i) = x1;
+        lines(4, i) = y1;
+        lines(5, i) = x2;
+        lines(6, i) = y2;
+    }
+}
+
 typedef KDTreeSingleIndexAdaptor<L2_Simple_Adaptor<double, PointCloud<double>>, PointCloud<double>, 3> my_kd_tree_t;
 
 int main(int argc, char *argv[]) {
@@ -93,27 +123,32 @@ int main(int argc, char *argv[]) {
     std::vector<double> cross_y = {25, 75,  75,  25, 25, -25, -25, -75, -75, -25, -25, 25, 25};
     plt::plot(square_x, square_y, "k");
 
-    std::vector<double> shape_x, shape_y;
-    get_shape(square_x, square_y, shape_x, shape_y, resolution);
-    PointCloud<double> cloud;
-    cloud.pts.resize(shape_x.size());
-    for (uint i = 0; i < shape_x.size(); ++i) {
-        cloud.pts[i].x = shape_x[i];
-        cloud.pts[i].y = shape_y[i];
-        cloud.pts[i].z = 0;
-    }
+    // std::vector<double> shape_x, shape_y;
+    // get_shape(square_x, square_y, shape_x, shape_y, resolution);
+    // PointCloud<double> cloud;
+    // cloud.pts.resize(shape_x.size());
+    // for (uint i = 0; i < shape_x.size(); ++i) {
+    //     cloud.pts[i].x = shape_x[i];
+    //     cloud.pts[i].y = shape_y[i];
+    //     cloud.pts[i].z = 0;
+    // }
+    //
+    // my_kd_tree_t   index(3, cloud, KDTreeSingleIndexAdaptorParams(10));
+    // index.buildIndex();
 
-    my_kd_tree_t   index(3, cloud, KDTreeSingleIndexAdaptorParams(10));
-    index.buildIndex();
+    Eigen::MatrixXd lines;
+    get_lines(square_x, square_y, lines);
 
-    std::vector<double> x1, y1, desc1, x2, y2, desc2;
+    std::vector<double> x1, y1, x2, y2;
     std::vector<int64_t> t1, t2;
-    std::vector<float> a1, a2;
+    std::vector<double> a1, a2;
     double delta_t = 0.000625;
     double time = 0.0;
     double search_increment = 0.25;
     double search_distance = 100.0;
     const double search_radius = 0.5;
+    Eigen::MatrixXd desc1 = Eigen::MatrixXd::Zero(2, 400);
+    Eigen::MatrixXd desc2 = Eigen::MatrixXd::Zero(2, 400);
 
     std::vector<double> x_pos_vec, y_pos_vec;
 
@@ -134,7 +169,6 @@ int main(int argc, char *argv[]) {
             }
             x_pos_vec.push_back(x_pos);
             y_pos_vec.push_back(y_pos);
-            std::cout << "theta: " << theta_pos << " x_pos: " << x_pos << " ypos: " << y_pos << std::endl;
 
             double theta_rad = i * 0.9 * M_PI / 180.0;
             double theta = theta_pos + theta_rad;
@@ -160,42 +194,56 @@ int main(int argc, char *argv[]) {
                 b = x_pos - m * y_pos;
                 flag = 1;
             }
-            // Line search to find closest point
-            double x_search = x_pos, y_search = y_pos;
-            int n = search_distance / search_increment;
-            for (int j = 0; j < n; ++j) {
-                double query_pt[3] = {x_search, y_search, 0};
-                std::vector<std::pair<size_t, double>> ret_matches;
-                nanoflann::SearchParams params;
-                const size_t nMatches = index.radiusSearch(&query_pt[0], search_radius, ret_matches, params);
-                if (nMatches > 0) {
-                    int idx = ret_matches[0].first;
-                    double r = sqrt(pow(x_pos - cloud.pts[idx].x, 2) + pow(y_pos - cloud.pts[idx].y, 2));
-                    std::cout << "r: " << r << std::endl;
-                    if (scan == 0) {
-                        desc1.push_back(double(idx));
-                        x1.push_back(r * cos(theta_rad));
-                        y1.push_back(r * sin(theta_rad));
-                    } else {
-                        desc2.push_back(double(idx));
-                        x2.push_back(r * cos(theta_rad));
-                        y2.push_back(r * sin(theta_rad));
-                    }
-                    break;
+
+            double dmin = 1000000;
+            double x_true = 0, y_true = 0;
+            for (int j = 0; j < lines.cols(); ++j) {
+                double m2 = lines(1, j);
+                double b2 = lines(2, j);
+                double x_int = 0, y_int = 0;
+                if (!flag && lines(0, j) == 0) {
+                    x_int = (b2 - b) / (m - m2);
+                    y_int = m * x_int + b;
+                } else if (!flag && lines(0, j) == 1) {
+                    y_int = (m * b2 + b) / (1 - m * m2);
+                    x_int = m2 * y_int + b2;
+                } else if (flag && lines(0, j) == 0) {
+                    y_int = (m2 * b + b2) / (1 - m * m2);
+                    x_int = m * y_int + b;
+                } else {
+                    y_int = (b2 - b) / (m - m2);
+                    x_int = m * y_int + b;
                 }
-                if (flag == 0) {
-                    if (M_PI / 2 <= theta && theta < 3 * M_PI / 2)
-                        x_search -= search_increment;
-                    else
-                        x_search += search_increment;
-                    y_search =  m * x_search + b;
-                } else if (flag == 1) {
-                    if (0 <= theta && theta < M_PI)
-                        y_search += search_increment;// using namespace Nabo;  // NOLINT
-                    else
-                        y_search -= search_increment;
-                    x_search = m * y_search + b;
+                // double theta_test = atan2(y_int - y_pos, x_int - x_pos);
+                if ((0 <= theta && theta < M_PI && (y_int - y_pos) < 0) ||
+                    (M_PI <= theta && theta < 2 * M_PI && (y_int - y_pos) > 0)) {
+                    continue;
                 }
+                std::vector<double> x_range = {lines(3, j), lines(5, j)};
+                std::sort(x_range.begin(), x_range.end());
+                std::vector<double> y_range = {lines(4, j), lines(6, j)};
+                std::sort(y_range.begin(), y_range.end());
+                if (x_int < x_range[0] || x_int > x_range[1] || y_int < y_range[0] || y_int > y_range[1]) {
+                    continue;
+                }
+                double d = pow(x_pos - x_int, 2) + pow(y_pos - y_int, 2);
+                if (d < dmin) {
+                    dmin = d;
+                    x_true = x_int;
+                    y_true = y_int;
+                }
+            }
+            double r = sqrt(pow(x_pos - x_true, 2) + pow(y_pos - y_true, 2));
+            if (scan == 0) {
+                desc1(0, i) = x_true;
+                desc1(1, i) = y_true;
+                x1.push_back(r * cos(theta_rad));
+                y1.push_back(r * sin(theta_rad));
+            } else {
+                desc2(0, i) = x_true;
+                desc2(1, i) = y_true;
+                x2.push_back(r * cos(theta_rad));
+                y2.push_back(r * sin(theta_rad));
             }
         }
     }
@@ -210,13 +258,13 @@ int main(int argc, char *argv[]) {
 
     // Perform NN matching using the descriptors from each cloud:
     PointCloud<double> cloud2;
-    cloud2.pts.resize(desc2.size());
-    for (uint i = 0; i < desc2.size(); ++i) {
-        cloud2.pts[i].x = desc2[i];
-        cloud2.pts[i].y = 0;
+    cloud2.pts.resize(desc2.cols());
+    for (uint i = 0; i < desc2.cols(); ++i) {
+        cloud2.pts[i].x = desc2(0, i);
+        cloud2.pts[i].y = desc2(1, i);
         cloud2.pts[i].z = 0;
     }
-    my_kd_tree_t index2(1, cloud2, KDTreeSingleIndexAdaptorParams(10));
+    my_kd_tree_t index2(2, cloud2, KDTreeSingleIndexAdaptorParams(1));
     index2.buildIndex();
     std::vector<int> matches;
     size_t num_results = 1;
@@ -224,24 +272,23 @@ int main(int argc, char *argv[]) {
     std::vector<double> out_dist_sqr(num_results);
 
     int size = 0;
-    for (uint i = 0; i < desc1.size(); ++i) {
-        double query_pt[3] = {desc1[i], 0, 0};
-        num_results = index2.knnSearch(&query_pt[0], num_results, &ret_index[0], &out_dist_sqr[0]);
+    for (uint i = 0; i < desc1.cols(); ++i) {
+        double query_pt[3] = {desc1(0, i), desc1(1, i), 0};
+        index2.knnSearch(&query_pt[0], 1, &ret_index[0], &out_dist_sqr[0]);
         if (!contains(matches, int(ret_index[0]))) {
             matches.push_back(ret_index[0]);
             size++;
         } else {
             matches.push_back(-1);
         }
-        // std::cout << "d1: " << desc1[i] << " d2: " << matches[i] << std::endl;
     }
 
     // Create the p1 and p2 matrices based on the matches:
-    Eigen::MatrixXf p1, p2;
-    p1 = Eigen::MatrixXf::Zero(2, size);
+    Eigen::MatrixXd p1, p2;
+    p1 = Eigen::MatrixXd::Zero(2, size);
     p2 = p1;
     int j = 0;
-    for (uint i = 0; i < desc1.size(); ++i) {
+    for (uint i = 0; i < desc1.cols(); ++i) {
         if (matches[i] == -1)
             continue;
         p1(0, j) = x1[i];
@@ -251,12 +298,12 @@ int main(int argc, char *argv[]) {
         j++;
     }
     // run the motion-distorted RANSAC to extract the desired transform, motion parameters?
-    Ransac<float> ransac(p2, p1, 0.35, 0.90, 100);
+    Ransac<double> ransac(p2, p1, 0.35, 0.90, 100);
     ransac.computeModel();
-    Eigen::MatrixXf T;
+    Eigen::MatrixXd T;
     ransac.getTransform(T);
     std::cout << "T: " << std::endl << T << std::endl;
-    Eigen::MatrixXf p2prime = Eigen::MatrixXf::Ones(3, p2.cols());
+    Eigen::MatrixXd p2prime = Eigen::MatrixXd::Ones(3, p2.cols());
     p2prime.block(0, 0, 2, p2.cols()) = p2;
     p2prime = T * p2prime;
     std::vector<double> x3, y3;
@@ -273,7 +320,7 @@ int main(int argc, char *argv[]) {
     MotionDistortedRansac mdransac(p1, p2, a1, a2, t1, t2, 0.35, 0.90, 100);
     std::cout << 1 << std::endl;
     mdransac.computeModel();
-    Eigen::VectorXf w;
+    Eigen::VectorXd w;
     mdransac.getMotion(w);
     std::cout << "w: " << std::endl << w << std::endl;
 

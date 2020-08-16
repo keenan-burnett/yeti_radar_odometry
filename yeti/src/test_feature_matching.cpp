@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
     cv::Mat img1, img2, desc1, desc2;
     std::vector<cv::KeyPoint> kp1, kp2;
     std::vector<int64_t> t1, t2;
-    std::vector<float> a1, a2;
+    std::vector<double> a1, a2;
     std::vector<bool> v1, v2;
     cv::Mat f1, f2;
 

@@ -18,7 +18,7 @@ int main() {
 
     float radar_resolution = 0.0432;
     std::vector<int64_t> timestamps;
-    std::vector<float> azimuths;
+    std::vector<double> azimuths;
     std::vector<bool> valid;
     cv::Mat fft_data;
 
