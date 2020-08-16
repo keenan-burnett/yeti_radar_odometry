@@ -36,15 +36,7 @@ struct PointCloud {
     bool kdtree_get_bbox(BBOX& /* bb */) const { return false; }
 };
 
-double wrap2pi(double theta) {
-    if (theta < 0) {
-        return theta + 2 * M_PI;
-    } else if (theta > 2 * M_PI) {
-        return theta - 2 * M_PI;
-    } else {
-        return theta;
-    }
-}
+
 
 template <typename T>
 bool contains(std::vector<T> v, T x) {
@@ -123,19 +115,6 @@ int main(int argc, char *argv[]) {
     std::vector<double> cross_y = {25, 75,  75,  25, 25, -25, -25, -75, -75, -25, -25, 25, 25};
     plt::plot(square_x, square_y, "k");
 
-    // std::vector<double> shape_x, shape_y;
-    // get_shape(square_x, square_y, shape_x, shape_y, resolution);
-    // PointCloud<double> cloud;
-    // cloud.pts.resize(shape_x.size());
-    // for (uint i = 0; i < shape_x.size(); ++i) {
-    //     cloud.pts[i].x = shape_x[i];
-    //     cloud.pts[i].y = shape_y[i];
-    //     cloud.pts[i].z = 0;
-    // }
-    //
-    // my_kd_tree_t   index(3, cloud, KDTreeSingleIndexAdaptorParams(10));
-    // index.buildIndex();
-
     Eigen::MatrixXd lines;
     get_lines(square_x, square_y, lines);
 
@@ -150,15 +129,14 @@ int main(int argc, char *argv[]) {
     Eigen::MatrixXd desc1 = Eigen::MatrixXd::Zero(2, 400);
     Eigen::MatrixXd desc2 = Eigen::MatrixXd::Zero(2, 400);
 
-    std::vector<double> x_pos_vec, y_pos_vec;
+    std::vector<double> x_pos_vec, y_pos_vec, theta_pos_vec;
 
     // Simulate the generation of two clouds, motion-distorted:
     for (int scan = 0; scan < 2; scan++) {
         for (int i = 0; i < 400; ++i) {
-            time += delta_t;
             // Get sensor position
             double theta_pos = omega * time;
-            theta_pos = wrap2pi(theta_pos);
+            theta_pos = wrapto2pi(theta_pos);
             double x_pos = 0, y_pos = 0;
             if (omega == 0) {
                 x_pos = v * time;
@@ -169,10 +147,11 @@ int main(int argc, char *argv[]) {
             }
             x_pos_vec.push_back(x_pos);
             y_pos_vec.push_back(y_pos);
+            theta_pos_vec.push_back(theta_pos);
 
             double theta_rad = i * 0.9 * M_PI / 180.0;
             double theta = theta_pos + theta_rad;
-            theta = wrap2pi(theta);
+            theta = wrapto2pi(theta);
             double m = 0;
             double b = 0;
             bool flag = 0;
@@ -219,6 +198,10 @@ int main(int argc, char *argv[]) {
                     (M_PI <= theta && theta < 2 * M_PI && (y_int - y_pos) > 0)) {
                     continue;
                 }
+                if (( ((0 <= theta && theta < M_PI / 2) || (3 * M_PI / 2 <= theta && theta < 2 * M_PI)) &&
+                    (x_int - x_pos) < 0) ||
+                    (M_PI / 2 <= theta && theta < 3 * M_PI / 2 && (x_int - x_pos) > 0))
+                    continue;
                 std::vector<double> x_range = {lines(3, j), lines(5, j)};
                 std::sort(x_range.begin(), x_range.end());
                 std::vector<double> y_range = {lines(4, j), lines(6, j)};
@@ -245,6 +228,7 @@ int main(int argc, char *argv[]) {
                 x2.push_back(r * cos(theta_rad));
                 y2.push_back(r * sin(theta_rad));
             }
+            time += delta_t;
         }
     }
 
@@ -275,8 +259,16 @@ int main(int argc, char *argv[]) {
     for (uint i = 0; i < desc1.cols(); ++i) {
         double query_pt[3] = {desc1(0, i), desc1(1, i), 0};
         index2.knnSearch(&query_pt[0], 1, &ret_index[0], &out_dist_sqr[0]);
-        if (!contains(matches, int(ret_index[0]))) {
-            matches.push_back(ret_index[0]);
+        int idx = int(ret_index[0]);
+        if (!contains(matches, idx)) {
+            std::cout << "********START**********" << std::endl;
+            std::cout << "size: " << size << " idx: " << idx << std::endl;
+            std::cout << "xpos1: " << x_pos_vec[i] << " ypos1: " << y_pos_vec[i] << " thetapos1: " << theta_pos_vec[i] << std::endl; // NOLINT
+            std::cout << "xpos2: " << x_pos_vec[400 + idx] << " ypos2: " << y_pos_vec[400 + idx] << " thetapos2: " << theta_pos_vec[400 + idx] << std::endl; // NOLINT
+            std::cout << "a1: " << a1[i] << " a2: " << a2[idx] << " delta_theta: " << a2[idx] - a1[i] << std::endl;
+            std::cout << "t1: " << t1[i] << " t2: " << t2[idx] << " delta_t: " << t2[idx] - t1[i] << std::endl;
+            std::cout << "d1: " << desc1(0, i) << " " << desc1(1, i) << " d2: " << desc2(0, idx) << " " << desc2(1, idx) << std::endl;  // NOLINT
+            matches.push_back(idx);
             size++;
         } else {
             matches.push_back(-1);
@@ -288,6 +280,8 @@ int main(int argc, char *argv[]) {
     p1 = Eigen::MatrixXd::Zero(2, size);
     p2 = p1;
     int j = 0;
+    std::vector<double> a1prime = a1, a2prime = a2;
+    std::vector<int64_t> t1prime = t1, t2prime = t2;
     for (uint i = 0; i < desc1.cols(); ++i) {
         if (matches[i] == -1)
             continue;
@@ -295,9 +289,19 @@ int main(int argc, char *argv[]) {
         p1(1, j) = y1[i];
         p2(0, j) = x2[matches[i]];
         p2(1, j) = y2[matches[i]];
+        a1prime[j] = a1[i];
+        a2prime[j] = a2[matches[i]];
+        std::cout << "j: " << j << " idx: " << matches[i] << " a1: " << a1prime[j] << " a2: " << a2prime[j] << " delta_theta: " << a2prime[j] - a1prime[j] << std::endl;
+        t1prime[j] = t1[i];
+        t2prime[j] = t2[matches[i]];
+        // std::cout << "delta_t: " << t2[j] - t1[j] << std::endl;
         j++;
     }
-    // run the motion-distorted RANSAC to extract the desired transform, motion parameters?
+    a1prime.resize(size+1);
+    a2prime.resize(size+1);
+    t1prime.resize(size+1);
+    t2prime.resize(size+1);
+    // run the rigid RANSAC algo for comparison
     Ransac<double> ransac(p2, p1, 0.35, 0.90, 100);
     ransac.computeModel();
     Eigen::MatrixXd T;
@@ -317,7 +321,7 @@ int main(int argc, char *argv[]) {
     plt::show();
 
     // run the motion-distorted RANSAC to extract the motion parameters:
-    MotionDistortedRansac mdransac(p1, p2, a1, a2, t1, t2, 0.35, 0.90, 100);
+    MotionDistortedRansac mdransac(p2, p1, a2prime, a1prime, t2prime, t1prime, 0.35, 0.90, 100);
     std::cout << 1 << std::endl;
     mdransac.computeModel();
     Eigen::VectorXd w;

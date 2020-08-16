@@ -203,6 +203,8 @@ Eigen::Matrix4d se3ToSE3(Eigen::MatrixXd xi);
 
 Eigen::MatrixXd eulerToRot(Eigen::VectorXd eul);
 
+double wrapto2pi(double theta);
+
 
 class MotionDistortedRansac {
 public:
@@ -236,8 +238,11 @@ public:
         for (uint i = 0; i < p1bar.cols(); ++i) {
             y1bar.block(0, i, 4, 1) = to_cylindrical(p1bar.block(0, i, 4, 1));
             y2bar.block(0, i, 4, 1) = to_cylindrical(p2bar.block(0, i, 4, 1));
-            delta_ts[i] = get_delta_t(y2bar.block(0, i, 4, 1), y1bar.block(0, i, 4, 1));
-            delta_theta_rads[i] = y2bar(1, i) - y1bar(1, i);
+            // delta_ts[i] = get_delta_t(y2bar.block(0, i, 4, 1), y1bar.block(0, i, 4, 1));
+            int64_t delta_t = t2[i] - t1[i];
+            delta_ts[i] = double(delta_t) / 1000000.0;
+            delta_theta_rads[i] = a2[i] - a1[i];
+            // delta_theta_rads[i] = y2bar(1, i) - y1bar(1, i);
         }
     }
     void setTolerance(double tolerance_) {tolerance = tolerance_;}

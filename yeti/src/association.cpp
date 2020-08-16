@@ -40,6 +40,16 @@ Eigen::MatrixXd squaredash(Eigen::VectorXd x) {
     return X;
 }
 
+double wrapto2pi(double theta) {
+    if (theta < 0) {
+        return theta + 2 * M_PI;
+    } else if (theta > 2 * M_PI) {
+        return theta - 2 * M_PI;
+    } else {
+        return theta;
+    }
+}
+
 Eigen::Matrix4d se3ToSE3(Eigen::MatrixXd xi) {
     assert(xi.rows() == 6);
     Eigen::Matrix4d T = Eigen::Matrix4d::Identity();
@@ -60,6 +70,10 @@ Eigen::Matrix4d se3ToSE3(Eigen::MatrixXd xi) {
     T.block(0, 3, 3, 1) = rho;
     return T;
 }
+
+// Eigen::VectorXd SE3tose3(Eigen::MatrixXd T) {
+//
+// }
 
 Eigen::MatrixXd eulerToRot(Eigen::VectorXd eul) {
     Eigen::Matrix3d C = Eigen::Matrix3d::Identity();
@@ -122,51 +136,54 @@ Eigen::VectorXd MotionDistortedRansac::from_cylindrical(Eigen::VectorXd ybar) {
     return p;
 }
 
-double MotionDistortedRansac::get_delta_t(Eigen::VectorXd y2, Eigen::VectorXd y1) {
-    double azimuth2 = y2(1);
-    double azimuth1 = y1(1);
-    double min_diff = 10000;
-    int closest_azimuth = 0;
-    for (uint i = 0; i < a1.size(); ++i) {
-        if (fabs(a1[i] - azimuth1) < min_diff) {
-            min_diff = fabs(a1[i] - azimuth1);
-            closest_azimuth = i;
-        }
-    }
-    int64_t time1 = t1[closest_azimuth];
-    min_diff = 10000;
-    closest_azimuth = 0;
-    for (uint i = 0; i < a2.size(); ++i) {
-        if (fabs(a2[i] - azimuth2) < min_diff) {
-            min_diff = fabs(a2[i] - azimuth2);
-            closest_azimuth = i;
-        }
-    }
-    int64_t time2 = t2[closest_azimuth];
-    int64_t delta_t = time2 - time1;
-    return double(delta_t) / 1000000.0;
-}
+// double MotionDistortedRansac::get_delta_t(Eigen::VectorXd y2, Eigen::VectorXd y1) {
+//     double azimuth2 = y2(1);
+//     double azimuth1 = y1(1);
+//     double min_diff = 10000;
+//     int closest_azimuth = 0;
+//     for (uint i = 0; i < a1.size(); ++i) {
+//         if (fabs(a1[i] - azimuth1) < min_diff) {
+//             min_diff = fabs(a1[i] - azimuth1);
+//             closest_azimuth = i;
+//         }
+//     }
+//     int64_t time1 = t1[closest_azimuth];
+//     min_diff = 10000;
+//     closest_azimuth = 0;
+//     for (uint i = 0; i < a2.size(); ++i) {
+//         if (fabs(a2[i] - azimuth2) < min_diff) {
+//             min_diff = fabs(a2[i] - azimuth2);
+//             closest_azimuth = i;
+//         }
+//     }
+//     int64_t time2 = t2[closest_azimuth];
+//     int64_t delta_t = time2 - time1;
+//     return double(delta_t) / 1000000.0;
+// }
 
 // Pre: set wbar to zero or use the wbar from the previous iteration?
 void MotionDistortedRansac::get_motion_parameters(Eigen::MatrixXd& p1small, Eigen::MatrixXd& p2small,
     std::vector<double> delta_t_local, std::vector<double> delta_theta_rad_local, Eigen::VectorXd &wbar) {
-    Eigen::MatrixXd A = Eigen::MatrixXd::Zero(6, 6);
-    Eigen::VectorXd b = Eigen::VectorXd::Zero(6);
     std::vector<double> error(100, 0.0);
-    for (int it = 0; it < 100; ++it) {
+    for (int it = 0; it < 10; ++it) {
+        Eigen::MatrixXd A = Eigen::MatrixXd::Zero(6, 6);
+        Eigen::VectorXd b = Eigen::VectorXd::Zero(6);
         for (int m = 0; m < p1small.cols(); ++m) {
             double delta_t = delta_t_local[m];
             Eigen::MatrixXd Tbar = se3ToSE3(delta_t * wbar);
-            double theta = delta_theta_rad_local[m];
+            // std::cout << "Tbar: " << Tbar << std::endl;
+            // double theta = delta_theta_rad_local[m];
+            // std::cout << "theta: " << theta << std::endl;
             // Eigen::MatrixXd C = Eigen::MatrixXd::Identity(4, 4);
-            // C(0, 0) = cos(theta); C(0, 1) = sin(theta);
-            // C(1, 0) = -sin(theta); C(1, 1) = cos(theta);
+            // C(0, 0) = cos(theta); C(0, 1) = -sin(theta);
+            // C(1, 0) = sin(theta); C(1, 1) = cos(theta);
             Eigen::VectorXd gbar = Tbar * p1small.block(0, m, 4, 1);
             Eigen::MatrixXd G = delta_t * circledot(gbar);
-            std::cout << "p1: " << p1small.block(0, m, 4, 1) << std::endl;
-            std::cout << "p2: " << p2small.block(0, m, 4, 1) << std::endl;
-            std::cout << "delta_t: " << delta_t << std::endl;
-            std::cout << "theta: " << theta << std::endl;
+            // std::cout << "p1: " << p1small.block(0, m, 4, 1) << std::endl;
+            // std::cout << "p2: " << p2small.block(0, m, 4, 1) << std::endl;
+            // std::cout << "gbar: " << gbar << std::endl;
+            // std::cout << "delta_t: " << delta_t << std::endl;
+            // std::cout << "theta: " << theta << std::endl;
 
             Eigen::VectorXd ebar = p2small.block(0, m, 4, 1) - gbar;
             // Eigen::MatrixXd H = get_inv_jacobian(gbar);
@@ -177,6 +194,7 @@ void MotionDistortedRansac::get_motion_parameters(Eigen::MatrixXd& p1small, Eige
             A += G.transpose() * G;
             b += G.transpose() * ebar;
         }
+        // Eigen::VectorXd delta_w = A.inverse() * b;
         Eigen::VectorXd delta_w = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(b);
         // Line search for best update
         double minError = 10000000;
@@ -188,9 +206,6 @@ void MotionDistortedRansac::get_motion_parameters(Eigen::MatrixXd& p1small, Eige
                 double delta_t = delta_t_local[m];
                 Eigen::MatrixXd Tbar = se3ToSE3(delta_t * wbar_temp);
                 double theta = delta_theta_rad_local[m];
-                // Eigen::MatrixXd C = Eigen::MatrixXd::Identity(4, 4);
-                // C(0, 0) = cos(theta); C(0, 1) = sin(theta);
-                // C(1, 0) = -sin(theta); C(1, 1) = cos(theta);
                 Eigen::VectorXd ebar = p2small.block(0, m, 4, 1) - Tbar * p1small.block(0, m, 4, 1);
                 e += ebar.norm();
             }
@@ -200,8 +215,8 @@ void MotionDistortedRansac::get_motion_parameters(Eigen::MatrixXd& p1small, Eige
             }
         }
         wbar = wbar + bestAlpha * delta_w;
-        // std::cout << "it: " << it << " error: " << minError << std::endl;
-        // std::cout << "wbar: " << wbar << std::endl;
+        std::cout << "it: " << it << " error: " << minError << std::endl;
+        std::cout << "wbar: " << wbar << std::endl;
     }
 }
 
@@ -303,8 +318,9 @@ void MotionDistortedRansac::getInliers(Eigen::VectorXd wbar, std::vector<int> &i
 int MotionDistortedRansac::computeModel() {
     std::vector<int> best_inliers;
     int subset_size = 2;
-    iterations = 1;
-    for (int i = 0; i < iterations; ++i) {
+    // iterations = 1;
+    int i = 0;
+    for (i = 0; i < iterations; ++i) {
         std::vector<int> subset = random_subset(p1bar.cols(), subset_size);
         // NLLS to obtain the motion estimate
         Eigen::MatrixXd p1small, p2small;
@@ -320,6 +336,7 @@ int MotionDistortedRansac::computeModel() {
         }
 
         Eigen::VectorXd wbar = Eigen::VectorXd::Zero(6, 1);
+        // wbar << -20, 0, 0, 0, 0, -M_PI/2;
         get_motion_parameters(p1small, p2small, delta_t_local, delta_theta_rad_local, wbar);
         // std::cout << "wbar: " << wbar << std::endl;
         // Check the number of inliers
@@ -344,8 +361,9 @@ int MotionDistortedRansac::computeModel() {
         delta_t_local[j] = delta_ts[best_inliers[j]];
         delta_theta_rad_local[j] = delta_theta_rads[best_inliers[j]];
     }
+    // w_best << -20, 0, 0, 0, 0, -M_PI/2;
     get_motion_parameters(p1small, p2small, delta_t_local, delta_theta_rad_local, w_best);
-    // std::cout << "iterations: " << i << std::endl;
+    std::cout << "iterations: " << i << std::endl;
     std::cout << "inlier ratio: " << double(best_inliers.size()) / double(p1bar.cols()) << std::endl;
     return best_inliers.size();
 }
