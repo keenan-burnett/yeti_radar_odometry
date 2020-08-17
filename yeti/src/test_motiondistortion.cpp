@@ -36,8 +36,6 @@ struct PointCloud {
     bool kdtree_get_bbox(BBOX& /* bb */) const { return false; }
 };
 
-
-
 template <typename T>
 bool contains(std::vector<T> v, T x) {
     for (uint i = 0; i < v.size(); ++i) {
@@ -45,27 +43,6 @@ bool contains(std::vector<T> v, T x) {
             return true;
     }
     return false;
-}
-
-void get_shape(std::vector<double> vertices_x, std::vector<double> vertices_y, std::vector<double> &shape_x,
-    std::vector<double> &shape_y, double resolution) {
-    assert(vertices_x.size() == vertices_y.size());
-    for (uint i = 0; i < vertices_x.size() - 1; ++i) {
-        double x1 = vertices_x[i];
-        double y1 = vertices_y[i];
-        double x2 = vertices_x[i + 1];
-        double y2 = vertices_y[i + 1];
-        double delta_x = x2 - x1;
-        double delta_y = y2 - y1;
-        double d = sqrt(pow(delta_x, 2) + pow(delta_y, 2));
-        int n = d / resolution;
-        shape_x.push_back(x1);
-        shape_y.push_back(y1);
-        for (int j = 0; j < n; j++) {
-            shape_x.push_back(x1 + j * delta_x / double(n));
-            shape_y.push_back(y1 + j * delta_y / double(n));
-        }
-    }
 }
 
 void get_lines(std::vector<double> vertices_x, std::vector<double> vertices_y, Eigen::MatrixXd &lines) {
@@ -108,7 +85,6 @@ int main(int argc, char *argv[]) {
     if (argc > 2)
         omega = atof(argv[2]);
     std::cout << v << " " << omega << std::endl;
-    double resolution = 0.1;
     std::vector<double> square_x = {25, -25, -25, 25, 25};
     std::vector<double> square_y = {25, 25, -25, -25, 25};
     std::vector<double> cross_x = {25, 25, -25, -25, -75, -75, -25, -25, 25, 25, 75, 75, 25};
@@ -123,12 +99,8 @@ int main(int argc, char *argv[]) {
     std::vector<double> a1, a2;
     double delta_t = 0.000625;
     double time = 0.0;
-    double search_increment = 0.25;
-    double search_distance = 100.0;
-    const double search_radius = 0.5;
     Eigen::MatrixXd desc1 = Eigen::MatrixXd::Zero(2, 400);
     Eigen::MatrixXd desc2 = Eigen::MatrixXd::Zero(2, 400);
-
     std::vector<double> x_pos_vec, y_pos_vec, theta_pos_vec;
 
     // Simulate the generation of two clouds, motion-distorted:
@@ -261,13 +233,6 @@ int main(int argc, char *argv[]) {
         index2.knnSearch(&query_pt[0], 1, &ret_index[0], &out_dist_sqr[0]);
         int idx = int(ret_index[0]);
         if (!contains(matches, idx)) {
-            std::cout << "********START**********" << std::endl;
-            std::cout << "size: " << size << " idx: " << idx << std::endl;
-            std::cout << "xpos1: " << x_pos_vec[i] << " ypos1: " << y_pos_vec[i] << " thetapos1: " << theta_pos_vec[i] << std::endl; // NOLINT
-            std::cout << "xpos2: " << x_pos_vec[400 + idx] << " ypos2: " << y_pos_vec[400 + idx] << " thetapos2: " << theta_pos_vec[400 + idx] << std::endl; // NOLINT
-            std::cout << "a1: " << a1[i] << " a2: " << a2[idx] << " delta_theta: " << a2[idx] - a1[i] << std::endl;
-            std::cout << "t1: " << t1[i] << " t2: " << t2[idx] << " delta_t: " << t2[idx] - t1[i] << std::endl;
-            std::cout << "d1: " << desc1(0, i) << " " << desc1(1, i) << " d2: " << desc2(0, idx) << " " << desc2(1, idx) << std::endl;  // NOLINT
             matches.push_back(idx);
             size++;
         } else {
@@ -291,10 +256,8 @@ int main(int argc, char *argv[]) {
         p2(1, j) = y2[matches[i]];
         a1prime[j] = a1[i];
         a2prime[j] = a2[matches[i]];
-        std::cout << "j: " << j << " idx: " << matches[i] << " a1: " << a1prime[j] << " a2: " << a2prime[j] << " delta_theta: " << a2prime[j] - a1prime[j] << std::endl;
         t1prime[j] = t1[i];
         t2prime[j] = t2[matches[i]];
-        // std::cout << "delta_t: " << t2[j] - t1[j] << std::endl;
         j++;
     }
     a1prime.resize(size+1);
@@ -302,11 +265,16 @@ int main(int argc, char *argv[]) {
     t1prime.resize(size+1);
     t2prime.resize(size+1);
     // run the rigid RANSAC algo for comparison
-    Ransac<double> ransac(p2, p1, 0.35, 0.90, 100);
+    Ransac ransac(p2, p1, 0.35, 0.90, 100);
     ransac.computeModel();
     Eigen::MatrixXd T;
     ransac.getTransform(T);
-    std::cout << "T: " << std::endl << T << std::endl;
+    Eigen::MatrixXd T2 = Eigen::MatrixXd::Identity(4, 4);
+    T2.block(0, 0, 2, 2) = T.block(0, 0, 2, 2);
+    T2.block(0, 3, 2, 1) = T.block(0, 2, 2, 1);
+    std::cout << "(RIGID) T: " << std::endl << T2 << std::endl;
+    Eigen::VectorXd xi = SE3tose3(T2) * 4;
+    std::cout << "(RIGID) wbar: " << xi << std::endl;
     Eigen::MatrixXd p2prime = Eigen::MatrixXd::Ones(3, p2.cols());
     p2prime.block(0, 0, 2, p2.cols()) = p2;
     p2prime = T * p2prime;
@@ -321,12 +289,14 @@ int main(int argc, char *argv[]) {
     plt::show();
 
     // run the motion-distorted RANSAC to extract the motion parameters:
-    MotionDistortedRansac mdransac(p2, p1, a2prime, a1prime, t2prime, t1prime, 0.35, 0.90, 100);
-    std::cout << 1 << std::endl;
+    MotionDistortedRansac mdransac(p2, p1, t2prime, t1prime, 0.35, 0.90, 100);
     mdransac.computeModel();
     Eigen::VectorXd w;
     mdransac.getMotion(w);
-    std::cout << "w: " << std::endl << w << std::endl;
+    Eigen::MatrixXd Tmd;
+    Tmd = se3ToSE3(w / 4);
+    std::cout << "(MD) T: " << std::endl << Tmd.inverse() << std::endl;
+    std::cout << "(MD) wbar: " << std::endl << w * -1 << std::endl;
 
     return 0;
 }

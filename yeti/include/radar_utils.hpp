@@ -57,7 +57,7 @@ void convert_to_bev(Eigen::MatrixXf cart_points, float cart_resolution, int cart
     std::vector<cv::Point2f> &bev_points);
 
 void convert_bev_to_polar(Eigen::MatrixXf bev_points, float cart_resolution, int cart_pixel_width,
-    Eigen::MatrixXf &cart_points);
+    Eigen::MatrixXd &cart_points);
 
 /*!
    \brief Draws a red dot for each feature on the top-down cartesian view of the radar image

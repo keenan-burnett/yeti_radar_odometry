@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
     std::vector<bool> v1, v2;
     cv::Mat f1, f2;
 
-    double ransactime = 0;
+    // double ransactime = 0;
 
     for (uint i = 0; i < radar_files.size() - 1; ++i) {
         std::cout << i << std::endl;
@@ -121,16 +121,16 @@ int main(int argc, char *argv[]) {
             p2(0, j) = kp2[good_matches[j].trainIdx].pt.x;
             p2(1, j) = kp2[good_matches[j].trainIdx].pt.y;
         }
-        Eigen::MatrixXf p1cart, p2cart;
+        Eigen::MatrixXd p1cart, p2cart;
         convert_bev_to_polar(p1, cart_resolution, cart_pixel_width, p1cart);
         convert_bev_to_polar(p2, cart_resolution, cart_pixel_width, p2cart);
 
 
         // Compute the transformation using RANSAC
         start = std::chrono::high_resolution_clock::now();
-        Ransac<float> ransac(p2cart, p1cart, 0.35, 0.90, 100);
+        Ransac ransac(p2cart, p1cart, 0.35, 0.90, 100);
         ransac.computeModel();
-        Eigen::MatrixXf T;
+        Eigen::MatrixXd T;
         ransac.getTransform(T);
 
         // Compute the transformation using motion-distorted RANSAC

@@ -10,30 +10,7 @@
    \param R The input rotation matrix either 2x2 or 3x3, will be overwritten with a slightly modified matrix to
    satisfy orthogonality conditions.
 */
-template<typename T>
-void enforce_orthogonality(Eigen::Matrix<T, -1, -1> &R) {
-    if (R.cols() == 3) {
-        const Eigen::Matrix<T, 3, 1> col1 = R.block(0, 1, 3, 1).normalized();
-        const Eigen::Matrix<T, 3, 1> col2 = R.block(0, 2, 3, 1).normalized();
-        const Eigen::Matrix<T, 3, 1> newcol0 = col1.cross(col2);
-        const Eigen::Matrix<T, 3, 1> newcol1 = col2.cross(newcol0);
-        R.block(0, 0, 3, 1) = newcol0;
-        R.block(0, 1, 3, 1) = newcol1;
-        R.block(0, 2, 3, 1) = col2;
-    } else if (R.cols() == 2) {
-        const T epsilon = 0.001;
-        if (fabs(R(0, 0) - R(1, 1)) > epsilon || fabs(R(1, 0) + R(0, 1)) > epsilon) {
-            std::cout << "ERROR: this is not a proper rigid transformation!" << std::endl;
-        }
-        T a = (R(0, 0) + R(1, 1)) / 2;
-        T b = (-R(1, 0) + R(0, 1)) / 2;
-        T sum = sqrt(pow(a, 2) + pow(b, 2));
-        a /= sum;
-        b /= sum;
-        R(0, 0) = a; R(0, 1) = b;
-        R(1, 0) = -b; R(1, 1) = a;
-    }
-}
+void enforce_orthogonality(Eigen::MatrixXd &R);
 
 /*!
    \brief Retrieve the rigid transformation that transforms points in p1 into points in p2.
@@ -44,180 +21,60 @@ void enforce_orthogonality(Eigen::Matrix<T, -1, -1> &R) {
    \pre p1 and p2 are the same size. p1 and p2 are the matched feature point locations between two point clouds
    \post orthogonality is enforced on the rotation matrix.
 */
-template<typename T>
-void get_rigid_transform(Eigen::Matrix<T, -1, -1> p1, Eigen::Matrix<T, -1, -1> p2, Eigen::Matrix<T, -1, -1> &Tf) {
-    assert(p1.cols() == p2.cols());
-    assert(p1.rows() == p2.rows());
-    const int dim = p1.rows();
-    Eigen::Matrix<T, -1, -1> mu1 = Eigen::Matrix<T, -1, -1>::Zero(dim, 1);
-    Eigen::Matrix<T, -1, -1> mu2 = mu1;
-    // Calculate centroid of each point cloud
-    for (int i = 0; i < p1.cols(); ++i) {
-        mu1 += p1.block(0, i, dim, 1);
-        mu2 += p2.block(0, i, dim, 1);
-    }
-    mu1 /= p1.cols();
-    mu2 /= p1.cols();
-    // Subtract centroid from each cloud
-    auto q1 = p1;
-    auto q2 = p2;
-    for (int i = 0; i < p1.cols(); ++i) {
-        q1.block(0, i, dim, 1) -= mu1;
-        q2.block(0, i, dim, 1) -= mu2;
-    }
-    // Calculate rotation using SVD
-    Eigen::Matrix<T, -1, -1> H = Eigen::Matrix<T, -1, -1>::Zero(dim, dim);
-    for (int i = 0; i < p1.cols(); ++i) {
-        Eigen::Matrix<T, -1, -1> H_prime = Eigen::Matrix<T, -1, -1>::Zero(dim, dim);
-        H_prime = q1.block(0, i, dim, 1) * q2.block(0, i, dim, 1).transpose();
-        H += H_prime;
-    }
-    auto svd = H.bdcSvd(Eigen::ComputeFullU | Eigen::ComputeFullV);
-    Eigen::Matrix<T, -1, -1> U = svd.matrixU();
-    Eigen::Matrix<T, -1, -1> V = svd.matrixV();
-    Eigen::Matrix<T, -1, -1> R_hat = V * U.transpose();
-    if (R_hat.determinant() < 0) {
-        V.block(0, dim - 1, dim, 1) = -1 * V.block(0, dim - 1, dim, 1);
-        R_hat = V * U.transpose();
-    }
-    if (R_hat.determinant() != 1.0)
-        enforce_orthogonality(R_hat);
-    // Calculate translation
-    Eigen::Matrix<T, -1, -1> t = mu2 - R_hat * mu1;
-    // Create the output transformation
-    Tf = Eigen::Matrix<T, -1, -1>::Identity(dim + 1, dim + 1);
-    Tf.block(0, 0, dim, dim) = R_hat;
-    Tf.block(0, dim, dim, 1) = t;
-}
+void get_rigid_transform(Eigen::MatrixXd p1, Eigen::MatrixXd p2, Eigen::MatrixXd &Tf);
 
 /*!
    \brief Returns a random subset of indices, where 0 <= indices[i] <= max_index. indices are non-repeating.
 */
-static std::vector<int> random_subset(int max_index, int subset_size) {
-    std::vector<int> subset;
-    if (max_index < 0 || subset_size < 0)
-        return subset;
-    if (max_index < subset_size)
-        subset_size = max_index;
-    subset = std::vector<int>(subset_size, -1);
-    for (uint i = 0; i < subset.size(); i++) {
-        while (subset[i] < 0) {
-            int idx = std::rand() % max_index;
-            if (std::find(subset.begin(), subset.begin() + i, idx) == subset.begin() + i)
-                subset[i] = idx;
-        }
-    }
-    return subset;
-}
-
-template<class T>
-class Ransac {
-public:
-    // p1, p2 need to be either (x, y) x N or (x, y, z) x N (must be in homogeneous coordinates)
-    Ransac(Eigen::Matrix<T, -1, -1> p1_, Eigen::Matrix<T, -1, -1> p2_, double tolerance_, double inlier_ratio_,
-        int iterations_) : p1(p1_), p2(p2_), tolerance(tolerance_), inlier_ratio(inlier_ratio_),
-        iterations(iterations_) {
-        assert(p1.cols() == p2.cols());
-        assert(p1.rows() == p2.rows());
-        int dim = p1.rows();
-        assert(dim == 2 || dim == 3);
-        T_best = Eigen::Matrix<T, -1, -1>::Identity(dim + 1, dim + 1);
-    }
-    void setTolerance(double tolerance_) {tolerance = tolerance_;}
-    void setInlierRatio(double inlier_ratio_) {inlier_ratio = inlier_ratio_;}
-    void setMaxIterations(int iterations_) {iterations = iterations_;}
-    void getTransform(Eigen::Matrix<T, -1, -1> &Tf) {Tf = T_best;}
-
-    int computeModel() {
-        uint max_inliers = 0;
-        std::vector<int> best_inliers;
-        int dim = p1.rows();
-        int subset_size = 2;
-        int i = 0;
-        for (i = 0; i < iterations; ++i) {
-            std::vector<int> subset = random_subset(p1.cols(), subset_size);
-            if ((int)subset.size() < subset_size)
-                continue;
-            // Compute transform from the random sample
-            Eigen::Matrix<T, -1, -1> p1small, p2small;
-            p1small = Eigen::Matrix<T, -1, -1>::Zero(dim, subset_size);
-            p2small = p1small;
-            for (int j = 0; j < subset_size; ++j) {
-                p1small.block(0, j, dim, 1) = p1.block(0, subset[j], dim, 1);
-                p2small.block(0, j, dim, 1) = p2.block(0, subset[j], dim, 1);
-            }
-            Eigen::Matrix<T, -1, -1> T_current;
-            get_rigid_transform(p1small, p2small, T_current);
-            // Check the number of inliers
-            std::vector<int> inliers;
-            getInliers(T_current, inliers);
-            if (inliers.size() > max_inliers) {
-                best_inliers = inliers;
-                max_inliers = inliers.size();
-            }
-            if (double(inliers.size()) / double(p1.cols()) > inlier_ratio)
-                break;
-        }
-        // Refine transformation using the inlier set
-        Eigen::Matrix<T, -1, -1> p1small, p2small;
-        p1small = Eigen::Matrix<T, -1, -1>::Zero(dim, best_inliers.size());
-        p2small = p1small;
-        for (uint j = 0; j < best_inliers.size(); ++j) {
-            p1small.block(0, j, dim, 1) = p1.block(0, best_inliers[j], dim, 1);
-            p2small.block(0, j, dim, 1) = p2.block(0, best_inliers[j], dim, 1);
-        }
-        get_rigid_transform(p1small, p2small, T_best);
-        // std::cout << "iterations: " << i << std::endl;
-        std::cout << "inlier ratio: " << double(max_inliers) / double(p1.cols()) << std::endl;
-        return max_inliers;
-    }
-
-private:
-    Eigen::Matrix<T, -1, -1> p1, p2;
-    double tolerance = 0.05;
-    double inlier_ratio = 0.9;
-    int iterations = 40;
-    Eigen::Matrix<T, -1, -1> T_best;
-
-    void getInliers(Eigen::Matrix<T, -1, -1> Tf, std::vector<int> &inliers) {
-        int dim = p1.rows();
-        Eigen::Matrix<T, -1, -1> p1_prime = Eigen::Matrix<T, -1, -1>::Ones(dim + 1, p1.cols());
-        p1_prime.block(0, 0, dim, p1.cols()) = p1;
-        p1_prime = Tf * p1_prime;
-        inliers.clear();
-        for (uint i = 0; i < p1_prime.cols(); ++i) {
-            auto distance = (p1_prime.block(0, i, dim, 1) - p2.block(0, i, dim, 1)).norm();
-            if (distance < tolerance)
-                inliers.push_back(i);
-        }
-    }
-};
+std::vector<int> random_subset(int max_index, int subset_size);
 
 Eigen::MatrixXd cross(Eigen::VectorXd x);
 
 Eigen::MatrixXd circledot(Eigen::VectorXd x);
 
-Eigen::MatrixXd squaredash(Eigen::VectorXd x);
-
 Eigen::Matrix4d se3ToSE3(Eigen::MatrixXd xi);
+
+Eigen::VectorXd SE3tose3(Eigen::MatrixXd T);
 
 Eigen::MatrixXd eulerToRot(Eigen::VectorXd eul);
 
 double wrapto2pi(double theta);
 
+class Ransac {
+public:
+    // p1, p2 need to be either (x, y) x N or (x, y, z) x N (must be in homogeneous coordinates)
+    Ransac(Eigen::MatrixXd p1_, Eigen::MatrixXd p2_, double tolerance_, double inlier_ratio_,
+        int iterations_) : p1(p1_), p2(p2_), tolerance(tolerance_), inlier_ratio(inlier_ratio_),
+        iterations(iterations_) {
+        int dim = p1.rows();
+        assert(p1.cols() == p2.cols() && p1.rows() == p2.rows() && (dim == 2 || dim == 3));
+        T_best = Eigen::MatrixXd::Identity(dim + 1, dim + 1);
+    }
+    void setTolerance(double tolerance_) {tolerance = tolerance_;}
+    void setInlierRatio(double inlier_ratio_) {inlier_ratio = inlier_ratio_;}
+    void setMaxIterations(int iterations_) {iterations = iterations_;}
+    void getTransform(Eigen::MatrixXd &Tf) {Tf = T_best;}
 
+    int computeModel();
+
+private:
+    Eigen::MatrixXd p1, p2;
+    double tolerance = 0.05;
+    double inlier_ratio = 0.9;
+    int iterations = 40;
+    Eigen::MatrixXd T_best;
+
+    void getInliers(Eigen::MatrixXd Tf, std::vector<int> &inliers);
+};
+
+// All operations are done in SE(3) even if the input is 2D. The output motion and transforms are in 3D.
 class MotionDistortedRansac {
 public:
-    MotionDistortedRansac(Eigen::MatrixXd p1, Eigen::MatrixXd p2, std::vector<double> a1_, std::vector<double> a2_,
-        std::vector<int64_t> t1_, std::vector<int64_t> t2_, double tolerance_, double inlier_ratio_, int iterations_) :
-        a1(a1_), a2(a2_), t1(t1_), t2(t2_), tolerance(tolerance_), inlier_ratio(inlier_ratio_),
-        iterations(iterations_) {
-        std::cout << p1.cols() << " " << p1.rows() << std::endl;
-        assert(p1.cols() == p2.cols());
-        assert(p1.rows() == p2.rows());
-        assert(p1.cols() >= p1.rows());
+    MotionDistortedRansac(Eigen::MatrixXd p1, Eigen::MatrixXd p2, std::vector<int64_t> t1_, std::vector<int64_t> t2_,
+        double tolerance_, double inlier_ratio_, int iterations_) : t1(t1_), t2(t2_), tolerance(tolerance_),
+        inlier_ratio(inlier_ratio_), iterations(iterations_) {
         const int dim = p1.rows();
-        assert(dim == 2 || dim == 3);
+        assert(p1.cols() == p2.cols() && p1.rows() == p2.rows() && p1.cols() >= p1.rows() && (dim == 2 || dim == 3));
         T_best = Eigen::MatrixXd::Zero(dim + 1, dim + 1);
         p1bar = Eigen::MatrixXd::Zero(4, p1.cols());
         p2bar = Eigen::MatrixXd::Zero(4, p2.cols());
@@ -234,20 +91,18 @@ public:
         y1bar = Eigen::MatrixXd::Zero(4, p1.cols());
         y2bar = Eigen::MatrixXd::Zero(4, p1.cols());
         delta_ts = std::vector<double>(p1.cols(), 0.0);
-        delta_theta_rads = std::vector<double>(p1.cols(), 0.0);
         for (uint i = 0; i < p1bar.cols(); ++i) {
             y1bar.block(0, i, 4, 1) = to_cylindrical(p1bar.block(0, i, 4, 1));
             y2bar.block(0, i, 4, 1) = to_cylindrical(p2bar.block(0, i, 4, 1));
-            // delta_ts[i] = get_delta_t(y2bar.block(0, i, 4, 1), y1bar.block(0, i, 4, 1));
             int64_t delta_t = t2[i] - t1[i];
             delta_ts[i] = double(delta_t) / 1000000.0;
-            delta_theta_rads[i] = a2[i] - a1[i];
-            // delta_theta_rads[i] = y2bar(1, i) - y1bar(1, i);
         }
     }
     void setTolerance(double tolerance_) {tolerance = tolerance_;}
     void setInlierRatio(double inlier_ratio_) {inlier_ratio = inlier_ratio_;}
     void setMaxIterations(int iterations_) {iterations = iterations_;}
+    void setMaxGNIterations(int iterations_) {max_gn_iterations = iterations_;}
+    void setConvergenceThreshold(double eps) {epsilon_converge = eps;}
     void getTransform(Eigen::MatrixXd &Tf) {Tf = T_best;}
     void getMotion(Eigen::VectorXd &w) {w = w_best;}
     int computeModel();
@@ -256,13 +111,12 @@ private:
     Eigen::MatrixXd p1bar, p2bar;
     Eigen::MatrixXd y1bar, y2bar;
     std::vector<double> delta_ts;
-    std::vector<double> delta_theta_rads;
-    std::vector<double> a1, a2;
     std::vector<int64_t> t1, t2;
     double tolerance = 0.05;
     double inlier_ratio = 0.9;
     int iterations = 40;
     int max_gn_iterations = 10;
+    double epsilon_converge = 0.01;
     int dim = 2;
     Eigen::MatrixXd T_best;
     Eigen::VectorXd w_best = Eigen::VectorXd::Zero(6);
@@ -271,12 +125,9 @@ private:
     Eigen::MatrixXd get_inv_jacobian(Eigen::Vector4d gbar);
     Eigen::VectorXd to_cylindrical(Eigen::VectorXd gbar);
     Eigen::VectorXd from_cylindrical(Eigen::VectorXd ybar);
-    double get_delta_t(Eigen::VectorXd y2, Eigen::VectorXd y1);
     void get_motion_parameters(Eigen::MatrixXd &p1small, Eigen::MatrixXd &p2small, std::vector<double> delta_t_local,
-        std::vector<double> delta_theta_rad_local, Eigen::VectorXd &wbar);
+        Eigen::VectorXd &wbar);
     void get_motion_parameters2(Eigen::MatrixXd& p1small, Eigen::MatrixXd& p2small, std::vector<double> delta_t_local,
-        std::vector<double> delta_theta_rad_local, Eigen::VectorXd &wbar);
-    void get_motion_parameters3(Eigen::MatrixXd& p1small, Eigen::MatrixXd& p2small, std::vector<double> delta_t_local,
-        std::vector<double> delta_theta_rad_local, Eigen::VectorXd &wbar);
+        Eigen::VectorXd &wbar);
     void getInliers(Eigen::VectorXd wbar, std::vector<int> &inliers);
 };

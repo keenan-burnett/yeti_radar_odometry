@@ -139,8 +139,8 @@ void convert_to_bev(Eigen::MatrixXf cart_points, float cart_resolution, int cart
 }
 
 void convert_bev_to_polar(Eigen::MatrixXf bev_points, float cart_resolution, int cart_pixel_width,
-    Eigen::MatrixXf &cart_points) {
-    cart_points = Eigen::MatrixXf::Zero(2, bev_points.cols());
+    Eigen::MatrixXd &cart_points) {
+    cart_points = Eigen::MatrixXd::Zero(2, bev_points.cols());
     float cart_min_range = (cart_pixel_width / 2) * cart_resolution;
     if (cart_pixel_width % 2 == 0)
         cart_min_range = (cart_pixel_width / 2 - 0.5) * cart_resolution;
