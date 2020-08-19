@@ -171,12 +171,13 @@ Eigen::VectorXd SE3tose3(Eigen::MatrixXd T) {
 }
 
 Eigen::MatrixXd eulerToRot(Eigen::VectorXd eul) {
-    Eigen::Matrix3d C = Eigen::Matrix3d::Identity();
-    Eigen::Matrix3d C1 = C, C2 = C, C3 = C;
+    Eigen::MatrixXd C = Eigen::Matrix3d::Identity(3, 3);
+    Eigen::MatrixXd C1 = C, C2 = C, C3 = C;
     C1 << 1, 0, 0, 0, cos(eul(0)), sin(eul(0)), 0, -sin(eul(0)), cos(eul(0));
     C2 << cos(eul(1)), 0, -sin(eul(1)), 0, 1, 0, sin(eul(1)), 0, cos(eul(1));
     C3 << cos(eul(2)), sin(eul(2)), 0, -sin(eul(2)), cos(eul(2)), 0, 0, 0, 1;
     C = C1 * C2 * C3;
+    enforce_orthogonality(C);
     return C;
 }
 
@@ -298,7 +299,6 @@ Eigen::VectorXd MotionDistortedRansac::from_cylindrical(Eigen::VectorXd ybar) {
     return p;
 }
 
-// Pre: set wbar to zero or use the wbar from the previous iteration?
 void MotionDistortedRansac::get_motion_parameters(Eigen::MatrixXd& p1small, Eigen::MatrixXd& p2small,
     std::vector<double> delta_t_local, Eigen::VectorXd &wbar) {
     for (int it = 0; it < max_gn_iterations; ++it) {

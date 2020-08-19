@@ -28,18 +28,56 @@ void get_rigid_transform(Eigen::MatrixXd p1, Eigen::MatrixXd p2, Eigen::MatrixXd
 */
 std::vector<int> random_subset(int max_index, int subset_size);
 
+/*!
+   \brief Returns the output of the cross operator.
+   For 3 x 1 input, cross(x) * y is equivalent to cross_product(x, y)
+   For 6 x 1 input, x = [rho, phi]^T. out = [cross(phi), rho; 0 0 0 1]
+   \param x Input vector which can be 3 x 1 or 6 x 1.
+   \return If the input if 3 x 1, the output is 3 x 3, if the input is 6 x 1, the output is 4 x 4.
+*/
 Eigen::MatrixXd cross(Eigen::VectorXd x);
 
+/*!
+   \brief Returns the output of the circledot operator. cross(epsilon) * p == circledot(p) * epsilon,
+   where epsilon is 6x1 and p is 4 x 1 homogeneous.
+   p = [rhobar, eta]^T  circledot(p) = [eta * identity(3), -cross(rhobar); 0 0 0 0 0 0]
+   \param x Input is a 4 x 1 homogeneous 3D vector.
+   \return returns the 4 x 6 output of circledot(x)
+*/
 Eigen::MatrixXd circledot(Eigen::VectorXd x);
 
+/*!
+   \brief This function converts from a lie vector to a 4 x 4 SE(3) transform.
+   // Lie Vector xi = [rho, phi]^T (6 x 1) --> SE(3) T = [C, R; 0 0 0 1] (4 x 4)
+   \param x Input vector is 6 x 1
+   \return Output is 4 x SE(3) transform
+*/
 Eigen::Matrix4d se3ToSE3(Eigen::MatrixXd xi);
 
+/*!
+   \brief This function converts from an SE(3) transform into a lie vector
+   // SE(3) T = [C, R; 0 0 0 1] (4 x 4) --> Lie Vector xi = [rho, phi]^T (6 x 1)
+   \param T Input is a 4x4 SE(3) transform
+   \return Output is 6x1 lie vector
+*/
 Eigen::VectorXd SE3tose3(Eigen::MatrixXd T);
 
+/*!
+   \brief Converts a vector of x-y-z euler parameters to a rotation matrix.
+   \param eul 3x1 vector of euler rotation parameters (x,y,z) == (roll, pitch, yaw)
+   \return Output is a 3x3 rotation matrix, equivalent to the given euler parameters.
+*/
 Eigen::MatrixXd eulerToRot(Eigen::VectorXd eul);
 
+/*!
+   \brief Ensures that theta is within [0, 2 * pi)
+*/
 double wrapto2pi(double theta);
 
+//* Ransac
+/**
+* \brief This class estimates a single rigid transform between two point clouds using RANSAC and singular value decomp
+*/
 class Ransac {
 public:
     // p1, p2 need to be either (x, y) x N or (x, y, z) x N (must be in homogeneous coordinates)
@@ -55,6 +93,9 @@ public:
     void setMaxIterations(int iterations_) {iterations = iterations_;}
     void getTransform(Eigen::MatrixXd &Tf) {Tf = T_best;}
 
+    /*!
+       \brief Computes the transform that best aligns the two pointclouds such at T * p1 = p2
+    */
     int computeModel();
 
 private:
@@ -64,10 +105,23 @@ private:
     int iterations = 40;
     Eigen::MatrixXd T_best;
 
+    /*!
+       \brief Retrieves the set of point pairs which are inliers given the current transform Tf.
+    */
     void getInliers(Eigen::MatrixXd Tf, std::vector<int> &inliers);
 };
 
-// All operations are done in SE(3) even if the input is 2D. The output motion and transforms are in 3D.
+//* MotionDistortedRansac
+/**
+* \brief This class estimates the linear velocity and angular velocity of the sensor in the body-frame.
+*
+* Assuming constant velocity, the motion vector can be used to estimate the transform between any two pairs of points
+* if the delta_t between those points is known.
+*
+* A single transform between the two pointclouds can also be retrieved.
+*
+* All operations are done in SE(3) even if the input is 2D. The output motion and transforms are in 3D.
+*/
 class MotionDistortedRansac {
 public:
     MotionDistortedRansac(Eigen::MatrixXd p1, Eigen::MatrixXd p2, std::vector<int64_t> t1_, std::vector<int64_t> t2_,
@@ -105,6 +159,10 @@ public:
     void setConvergenceThreshold(double eps) {epsilon_converge = eps;}
     void getTransform(Eigen::MatrixXd &Tf) {Tf = T_best;}
     void getMotion(Eigen::VectorXd &w) {w = w_best;}
+
+    /*!
+       \brief Computes the ego-motion vector that best aligns the two pointclouds
+    */
     int computeModel();
 
 private:
@@ -125,9 +183,25 @@ private:
     Eigen::MatrixXd get_inv_jacobian(Eigen::Vector4d gbar);
     Eigen::VectorXd to_cylindrical(Eigen::VectorXd gbar);
     Eigen::VectorXd from_cylindrical(Eigen::VectorXd ybar);
+
+    /*!
+       \brief Given two sets of point pairs (p1small, p2small), this function computes the motion of the sensor
+       (linear and angular velocity) in the body frame using nonlinear least squares.
+       \pre It's very important that the delt_t_local is accurate. Note that each azimuth in the radar scan is time
+       stamped, this should be used to get the more accurate time differences.
+    */
     void get_motion_parameters(Eigen::MatrixXd &p1small, Eigen::MatrixXd &p2small, std::vector<double> delta_t_local,
         Eigen::VectorXd &wbar);
+
+    /*!
+       \brief This function also computes the motion of the sensor, but it uses the linear least squares version of
+       MDRANSAC. This is a lot less accurate, but it computes the motion vector in a single step.
+    */
     void get_motion_parameters2(Eigen::MatrixXd& p1small, Eigen::MatrixXd& p2small, std::vector<double> delta_t_local,
         Eigen::VectorXd &wbar);
+
+    /*!
+       \brief Retrieves the set of point pairs which are inliers given the current motion estimate.
+    */
     void getInliers(Eigen::VectorXd wbar, std::vector<int> &inliers);
 };

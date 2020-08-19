@@ -56,6 +56,14 @@ void polar_to_cartesian_points(std::vector<double> azimuths, Eigen::MatrixXf pol
 void convert_to_bev(Eigen::MatrixXf cart_points, float cart_resolution, int cart_pixel_width,
     std::vector<cv::Point2f> &bev_points);
 
+
+/*!
+   \brief Converts points from pixel coordinates in the BEV image to metric cartesian coordinates
+   \param bev_points Vector of pixel locations in the BEV cartesian image (u, v)
+   \param cart_resolution Cartesian resolution (meters per pixel)
+   \param cart_pixel_width: Width and height of the returned square cartesian output (pixels)
+   \param cart_points [out] Vector of points in metric cartesian space (x, y)
+*/
 void convert_bev_to_polar(Eigen::MatrixXf bev_points, float cart_resolution, int cart_pixel_width,
     Eigen::MatrixXd &cart_points);
 

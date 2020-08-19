@@ -115,11 +115,14 @@ int main(int argc, char *argv[]) {
         // Convert the good key point matches to Eigen matrices
         Eigen::MatrixXf p1 = Eigen::MatrixXf::Zero(2, good_matches.size());
         Eigen::MatrixXf p2 = p1;
+        std::vector<int64_t> t1prime = t1, t2prime = t2;
         for (uint j = 0; j < good_matches.size(); ++j) {
             p1(0, j) = kp1[good_matches[j].queryIdx].pt.x;
             p1(1, j) = kp1[good_matches[j].queryIdx].pt.y;
+            t1prime[j] = t1[good_matches[j].queryIdx];
             p2(0, j) = kp2[good_matches[j].trainIdx].pt.x;
             p2(1, j) = kp2[good_matches[j].trainIdx].pt.y;
+            t2prime[j] = t2[good_matches[j].trainIdx];
         }
         Eigen::MatrixXd p1cart, p2cart;
         convert_bev_to_polar(p1, cart_resolution, cart_pixel_width, p1cart);

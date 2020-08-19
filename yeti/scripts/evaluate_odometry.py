@@ -1,5 +1,6 @@
 import numpy as np
 import csv
+import matplotlib.pyplot as plt
 from plot_scan_matching_accuracy import *
 
 lengths = [100, 200, 300, 400, 500, 600, 700, 800]
@@ -67,6 +68,54 @@ def saveSequenceErrors(err, file_name):
         for e in err:
             f.write("{},{},{},{},{}\n".format(e[0], e[1], e[2], e[3], e[4]))
 
+def saveErrorPlots(err, filename):
+    t_len_err = []
+    r_len_err = []
+    t_vel_err = []
+    r_vel_err = []
+    for i in range(0, len(lengths)):
+        length = lengths[i]
+        num = 0
+        t_err = 0
+        r_err = 0
+        for e in err:
+            if e[3] - length < 1.0:
+                t_err += e[2]
+                r_err += e[1]
+                num += 1
+        if num == 0:
+            break
+        t_len_err.append(t_err / float(num))
+        r_len_err.append(r_err / float(num))
+
+    for v in range(2, 26):
+        num = 0
+        t_err = 0
+        r_err = 0
+        for e in err:
+            if v - e[4] < 2.0:
+                t_err += e[2]
+                r_err += e[1]
+                num += 1
+        if num == 0:
+            break
+        t_vel_err.append(t_err / float(num))
+        r_vel_err.append(r_err / float(num))
+    fig, axs = plt.subplots(2, 2, tight_layout=True)
+    vx = np.arange(2, 26, 1)
+    l = len(t_len_err)
+    m = len(t_vel_err)
+    axs[0, 0].plot(lengths[:l], t_len_err, 'ob-')
+    axs[0, 0].set_title('Translation Error vs. Path Length')
+    axs[0, 1].plot(lengths[:l], r_len_err, 'ob-')
+    axs[0, 1].set_title('Rotation Error vs. Path Length')
+    axs[1, 0].plot(vx[:m], t_vel_err, 'ob-')
+    axs[1, 0].set_title('Translation Error vs. Speed')
+    axs[1, 1].plot(vx[:m], r_vel_err, 'ob-')
+    axs[1, 1].set_title('Rotation Error vs. Speed')
+    plt.savefig(filename)
+
+
 def getStats(err):
     t_err = 0
     r_err = 0
@@ -110,6 +159,7 @@ if __name__ == '__main__':
 
     err = calcSequenceErrors(poses_gt, poses_res)
     saveSequenceErrors(err, 'pose_error.csv')
+    saveErrorPlots(err, 'pose_error.png')
     t_err, r_err = getStats(err)
     print('t_err: {} %'.format(t_err * 100))
     print('r_err: {} deg/m'.format(r_err * 180 / np.pi))

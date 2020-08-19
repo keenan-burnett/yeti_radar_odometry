@@ -245,7 +245,6 @@ int main(int argc, char *argv[]) {
     p1 = Eigen::MatrixXd::Zero(2, size);
     p2 = p1;
     int j = 0;
-    std::vector<double> a1prime = a1, a2prime = a2;
     std::vector<int64_t> t1prime = t1, t2prime = t2;
     for (uint i = 0; i < desc1.cols(); ++i) {
         if (matches[i] == -1)
@@ -254,14 +253,10 @@ int main(int argc, char *argv[]) {
         p1(1, j) = y1[i];
         p2(0, j) = x2[matches[i]];
         p2(1, j) = y2[matches[i]];
-        a1prime[j] = a1[i];
-        a2prime[j] = a2[matches[i]];
         t1prime[j] = t1[i];
         t2prime[j] = t2[matches[i]];
         j++;
     }
-    a1prime.resize(size+1);
-    a2prime.resize(size+1);
     t1prime.resize(size+1);
     t2prime.resize(size+1);
     // run the rigid RANSAC algo for comparison
