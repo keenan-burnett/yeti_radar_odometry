@@ -12,7 +12,7 @@
    \param min_range We ignore the range bins less than this
    \param targets [out] Matrix of feature locations (azimuth_bin, range_bin, 1) x N
 */
-void cfar1d(cv::Mat fft_data, int window_size, float scale, int guard_cells, int min_range, Eigen::MatrixXf &targets);
+void cfar1d(cv::Mat fft_data, int window_size, float scale, int guard_cells, int min_range, Eigen::MatrixXd &targets);
 
 /*!
    \brief Extract features from polar radar data using the method described in cen_icra18
@@ -22,7 +22,7 @@ void cfar1d(cv::Mat fft_data, int window_size, float scale, int guard_cells, int
    \param min_range We ignore the range bins less than this
    \param targets [out] Matrix of feature locations (azimuth_bin, range_bin, 1) x N
 */
-void cen2018features(cv::Mat fft_data, float zq, int sigma_gauss, int min_range, Eigen::MatrixXf &targets);
+void cen2018features(cv::Mat fft_data, float zq, int sigma_gauss, int min_range, Eigen::MatrixXd &targets);
 
 /*!
    \brief Extract features from polar radar data using the method described in cen_icra19
@@ -31,4 +31,4 @@ void cen2018features(cv::Mat fft_data, float zq, int sigma_gauss, int min_range,
    \param min_range We ignore the range bins less than this
    \param targets [out] Matrix of feature locations (azimuth_bin, range_bin, 1) x N
 */
-void cen2019features(cv::Mat fft_data, int max_points, int min_range, Eigen::MatrixXf &targets);
+void cen2019features(cv::Mat fft_data, int max_points, int min_range, Eigen::MatrixXd &targets);

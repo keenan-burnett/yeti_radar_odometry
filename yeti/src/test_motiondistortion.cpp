@@ -257,8 +257,8 @@ int main(int argc, char *argv[]) {
         t2prime[j] = t2[matches[i]];
         j++;
     }
-    t1prime.resize(size+1);
-    t2prime.resize(size+1);
+    t1prime.resize(size);
+    t2prime.resize(size);
     // run the rigid RANSAC algo for comparison
     Ransac ransac(p2, p1, 0.35, 0.90, 100);
     ransac.computeModel();
@@ -292,6 +292,20 @@ int main(int argc, char *argv[]) {
     Tmd = se3ToSE3(w / 4);
     std::cout << "(MD) T: " << std::endl << Tmd.inverse() << std::endl;
     std::cout << "(MD) wbar: " << std::endl << w * -1 << std::endl;
+
+    // Test removing the motion distortion
+    std::vector<double> x4, y4;
+    for (uint i = 1; i < t1prime.size(); ++i) {
+        double delta_t = (t1prime[i] - t1prime[0])/1000000.0;
+        Eigen::MatrixXd T = se3ToSE3(w * delta_t);
+        Eigen::Vector4d p1bar = {p1(0, i), p1(1, i), 0, 1};
+        p1bar = T.inverse() * p1bar;
+        x4.push_back(p1bar(0));
+        y4.push_back(p1bar(1));
+    }
+
+    plt::scatter(x4, y4, 25.0);
+    plt::show();
 
     return 0;
 }

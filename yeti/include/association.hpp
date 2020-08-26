@@ -129,7 +129,6 @@ public:
         inlier_ratio(inlier_ratio_), iterations(iterations_) {
         const int dim = p1.rows();
         assert(p1.cols() == p2.cols() && p1.rows() == p2.rows() && p1.cols() >= p1.rows() && (dim == 2 || dim == 3));
-        T_best = Eigen::MatrixXd::Zero(dim + 1, dim + 1);
         p1bar = Eigen::MatrixXd::Zero(4, p1.cols());
         p2bar = Eigen::MatrixXd::Zero(4, p2.cols());
         p1bar.block(3, 0, 1, p1.cols()) = Eigen::MatrixXd::Ones(1, p1.cols());
@@ -157,7 +156,7 @@ public:
     void setMaxIterations(int iterations_) {iterations = iterations_;}
     void setMaxGNIterations(int iterations_) {max_gn_iterations = iterations_;}
     void setConvergenceThreshold(double eps) {epsilon_converge = eps;}
-    void getTransform(Eigen::MatrixXd &Tf) {Tf = T_best;}
+    void getTransform(double delta_t, Eigen::MatrixXd &Tf);
     void getMotion(Eigen::VectorXd &w) {w = w_best;}
 
     /*!
@@ -176,7 +175,7 @@ private:
     int max_gn_iterations = 10;
     double epsilon_converge = 0.01;
     int dim = 2;
-    Eigen::MatrixXd T_best;
+    double beta = 0.0478125;  // alpha = (f_t / (df / dt))
     Eigen::VectorXd w_best = Eigen::VectorXd::Zero(6);
     Eigen::Matrix4d R_pol = Eigen::Matrix4d::Identity();
     Eigen::MatrixXd get_jacobian(Eigen::Vector4d gbar);

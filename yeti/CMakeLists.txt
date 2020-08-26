@@ -137,3 +137,14 @@ target_link_libraries(test_motiondistortion
 	matplotlibcpp
 )
 target_compile_definitions(test_motiondistortion PRIVATE "-DWITHOUT_NUMPY")
+
+add_executable(test_doppler_distortion src/test_doppler_distortion.cpp)
+target_link_libraries(test_doppler_distortion
+    features
+    radar_utils
+    association
+	${catkin_LIBRARIES}
+	${OpenCV_LIBRARIES}
+	matplotlibcpp
+)
+target_compile_definitions(test_doppler_distortion PRIVATE "-DWITHOUT_NUMPY")

@@ -6,7 +6,7 @@
 #include <opencv2/highgui.hpp>
 #include <features.hpp>
 
-void cfar1d(cv::Mat fft_data, int window_size, float scale, int guard_cells, int min_range, Eigen::MatrixXf &targets) {
+void cfar1d(cv::Mat fft_data, int window_size, float scale, int guard_cells, int min_range, Eigen::MatrixXd &targets) {
     assert(fft_data.depth() == CV_32F);
     assert(fft_data.channels() == 1);
     auto t1 = std::chrono::high_resolution_clock::now();
@@ -30,7 +30,7 @@ void cfar1d(cv::Mat fft_data, int window_size, float scale, int guard_cells, int
             }
         }
     }
-    targets = Eigen::MatrixXf::Ones(3, t.size());
+    targets = Eigen::MatrixXd::Ones(3, t.size());
     for (uint i = 0; i < t.size(); ++i) {
         targets(0, i) = t[i].x;
         targets(1, i) = t[i].y;
@@ -41,7 +41,7 @@ void cfar1d(cv::Mat fft_data, int window_size, float scale, int guard_cells, int
 }
 
 // Runtime: 0.038s
-void cen2018features(cv::Mat fft_data, float zq, int sigma_gauss, int min_range, Eigen::MatrixXf &targets) {
+void cen2018features(cv::Mat fft_data, float zq, int sigma_gauss, int min_range, Eigen::MatrixXd &targets) {
     auto t1 = std::chrono::high_resolution_clock::now();
 
     std::vector<float> sigma_q(fft_data.rows, 0);
@@ -112,7 +112,7 @@ void cen2018features(cv::Mat fft_data, float zq, int sigma_gauss, int min_range,
             t.push_back(cv::Point(i, peak_points[peak_points.size() / 2]));
     }
 
-    targets = Eigen::MatrixXf::Ones(3, t.size());
+    targets = Eigen::MatrixXd::Ones(3, t.size());
     for (uint i = 0; i < t.size(); ++i) {
         targets(0, i) = t[i].x;
         targets(1, i) = t[i].y;
@@ -182,7 +182,7 @@ static void getMaxInRegion(cv::Mat &h, int a, int start, int end, int &max_r) {
 }
 
 // Runtime: 0.050s
-void cen2019features(cv::Mat fft_data, int max_points, int min_range, Eigen::MatrixXf &targets) {
+void cen2019features(cv::Mat fft_data, int max_points, int min_range, Eigen::MatrixXd &targets) {
     auto t1 = std::chrono::high_resolution_clock::now();
     // Calculate gradient along each azimuth using the Prewitt operator
     cv::Mat prewitt = cv::Mat::zeros(1, 3, CV_32F);
@@ -265,7 +265,7 @@ void cen2019features(cv::Mat fft_data, int max_points, int min_range, Eigen::Mat
         }
     }
 
-    targets = Eigen::MatrixXf::Ones(3, t.size());
+    targets = Eigen::MatrixXd::Ones(3, t.size());
     for (uint i = 0; i < t.size(); ++i) {
         targets(0, i) = t[i].x;
         targets(1, i) = t[i].y;

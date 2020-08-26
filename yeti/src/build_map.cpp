@@ -9,7 +9,7 @@
 #include "features.hpp"
 #include "pointmatcher/PointMatcher.h"
 
-typedef PointMatcher<float> PM;
+typedef PointMatcher<double> PM;
 typedef PM::DataPoints DP;
 using namespace PointMatcherSupport;  // NOLINT
 
@@ -64,9 +64,9 @@ int main(int argc, char *argv[]) {
     // Rigid transformation
     std::shared_ptr<PM::Transformation> rigidTrans;
     rigidTrans = PM::get().REG(Transformation).create("RigidTransformation");
-    PM::TransformationParameters T = Eigen::Matrix3f::Identity();
-    PM::TransformationParameters T_map_new = Eigen::Matrix3f::Identity();
-    Eigen::Matrix3f prior = Eigen::Matrix3f::Identity();
+    PM::TransformationParameters T = Eigen::Matrix3d::Identity();
+    PM::TransformationParameters T_map_new = Eigen::Matrix3d::Identity();
+    Eigen::Matrix3d prior = Eigen::Matrix3d::Identity();
 
     // for (uint i = 0; i < radar_files.size() - 1; ++i) {
     for (uint i = 0; i < 50; ++i) {
@@ -76,13 +76,13 @@ int main(int argc, char *argv[]) {
             load_radar(datadir + "/" + radar_files[i], t1, a1, v1, f1);
             load_radar(datadir + "/" + radar_files[i + 1], t2, a2, v2, f2);
             // Extract features
-            Eigen::MatrixXf targets1, targets2;
+            Eigen::MatrixXd targets1, targets2;
             // cen2019features(f1, max_points, min_range, targets1);
             // cen2019features(f2, max_points, min_range, targets2);
             cen2018features(f1, zq, sigma_gauss, min_range, targets1);
             cen2018features(f2, zq, sigma_gauss, min_range, targets2);
             // Convert targets to cartesian coordinates
-            Eigen::MatrixXf cart_targets1, cart_targets2;
+            Eigen::MatrixXd cart_targets1, cart_targets2;
             polar_to_cartesian_points(a1, targets1, radar_resolution, cart_targets1);
             polar_to_cartesian_points(a2, targets2, radar_resolution, cart_targets2);
             // Convert to libpointmatcher DataPoint class
@@ -92,10 +92,10 @@ int main(int argc, char *argv[]) {
         } else {
             t1 = t2; a1 = a2; v1 = v2; f1 = f2;
             load_radar(datadir + "/" + radar_files[i + 1], t2, a2, v2, f2);
-            Eigen::MatrixXf targets2;
+            Eigen::MatrixXd targets2;
             // cen2019features(f2, max_points, min_range, targets2);
             cen2018features(f2, zq, sigma_gauss, min_range, targets2);
-            Eigen::MatrixXf cart_targets2;
+            Eigen::MatrixXd cart_targets2;
             polar_to_cartesian_points(a2, targets2, radar_resolution, cart_targets2);
             // ref = newCloud;
             newCloud = DP(cart_targets2, labels);

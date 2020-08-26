@@ -8,7 +8,7 @@
 #include "features.hpp"
 #include "pointmatcher/PointMatcher.h"
 
-typedef PointMatcher<float> PM;
+typedef PointMatcher<double> PM;
 typedef PM::DataPoints DP;
 
 int main(int argc, char *argv[]) {
@@ -35,14 +35,14 @@ int main(int argc, char *argv[]) {
     std::cout << "R2: " << radar_files[1] << std::endl;
 
     // Extract features
-    Eigen::MatrixXf targets1, targets2;
+    Eigen::MatrixXd targets1, targets2;
     int min_range = 58;
     int max_points = 10000;
     cen2019features(f1, max_points, min_range, targets1);
     cen2019features(f2, max_points, min_range, targets2);
 
     // Convert targets to cartesian coordinates
-    Eigen::MatrixXf cart_targets1, cart_targets2;
+    Eigen::MatrixXd cart_targets1, cart_targets2;
     polar_to_cartesian_points(a1, targets1, radar_resolution, cart_targets1);
     polar_to_cartesian_points(a2, targets2, radar_resolution, cart_targets2);
 

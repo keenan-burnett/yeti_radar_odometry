@@ -68,51 +68,65 @@ def saveSequenceErrors(err, file_name):
         for e in err:
             f.write("{},{},{},{},{}\n".format(e[0], e[1], e[2], e[3], e[4]))
 
-def saveErrorPlots(err, filename):
-    t_len_err = []
-    r_len_err = []
-    t_vel_err = []
-    r_vel_err = []
-    for i in range(0, len(lengths)):
-        length = lengths[i]
-        num = 0
-        t_err = 0
-        r_err = 0
-        for e in err:
-            if e[3] - length < 1.0:
-                t_err += e[2]
-                r_err += e[1]
-                num += 1
-        if num == 0:
-            break
-        t_len_err.append(t_err / float(num))
-        r_len_err.append(r_err / float(num))
-
-    for v in range(2, 26):
-        num = 0
-        t_err = 0
-        r_err = 0
-        for e in err:
-            if v - e[4] < 2.0:
-                t_err += e[2]
-                r_err += e[1]
-                num += 1
-        if num == 0:
-            break
-        t_vel_err.append(t_err / float(num))
-        r_vel_err.append(r_err / float(num))
+def saveErrorPlots(errlist, filename):
     fig, axs = plt.subplots(2, 2, tight_layout=True)
-    vx = np.arange(2, 26, 1)
-    l = len(t_len_err)
-    m = len(t_vel_err)
-    axs[0, 0].plot(lengths[:l], t_len_err, 'ob-')
     axs[0, 0].set_title('Translation Error vs. Path Length')
-    axs[0, 1].plot(lengths[:l], r_len_err, 'ob-')
     axs[0, 1].set_title('Rotation Error vs. Path Length')
-    axs[1, 0].plot(vx[:m], t_vel_err, 'ob-')
     axs[1, 0].set_title('Translation Error vs. Speed')
-    axs[1, 1].plot(vx[:m], r_vel_err, 'ob-')
     axs[1, 1].set_title('Rotation Error vs. Speed')
+
+    for j in range(0, len(errlist)):
+        err = errlist[j]
+        t_len_err = []
+        r_len_err = []
+        t_vel_err = []
+        r_vel_err = []
+        for i in range(0, len(lengths)):
+            length = lengths[i]
+            num = 0
+            t_err = 0
+            r_err = 0
+            for e in err:
+                if e[3] - length < 1.0:
+                    t_err += e[2]
+                    r_err += e[1]
+                    num += 1
+            if num == 0:
+                break
+            t_len_err.append(t_err / float(num))
+            r_len_err.append(r_err / float(num))
+
+        for v in range(2, 26):
+            num = 0
+            t_err = 0
+            r_err = 0
+            for e in err:
+                if v - e[4] < 2.0:
+                    t_err += e[2]
+                    r_err += e[1]
+                    num += 1
+            if num == 0:
+                break
+            t_vel_err.append(t_err / float(num))
+            r_vel_err.append(r_err / float(num))
+
+        vx = np.arange(2, 26, 1)
+        l = len(t_len_err)
+        m = len(t_vel_err)
+        if j == 0:
+            axs[0, 0].plot(lengths[:l], t_len_err, 'ob-', label='RIGID')
+            axs[0, 1].plot(lengths[:l], r_len_err, 'ob-', label='RIGID')
+            axs[1, 0].plot(vx[:m], t_vel_err, 'ob-', label='RIGID')
+            axs[1, 1].plot(vx[:m], r_vel_err, 'ob-', label='RIGID')
+        if j == 1:
+            axs[0, 0].plot(lengths[:l], t_len_err, 'Dr-', label='MDRANSAC')
+            axs[0, 1].plot(lengths[:l], r_len_err, 'Dr-', label='MDRANSAC')
+            axs[1, 0].plot(vx[:m], t_vel_err, 'Dr-', label='MDRANSAC')
+            axs[1, 1].plot(vx[:m], r_vel_err, 'Dr-', label='MDRANSAC')
+
+    axLine, axLabel = axs[0, 0].get_legend_handles_labels()
+
+    fig.legend(axLine, axLabel, loc = 'best', fontsize='xx-small')
     plt.savefig(filename)
 
 
@@ -127,11 +141,13 @@ def getStats(err):
     return t_err, r_err
 
 if __name__ == '__main__':
-    afile = 'accuracy_large.csv'
+    afile = 'accuracy.csv'
     T_gt = np.identity(3)
     T_res = np.identity(3)
+    T_md = np.identity(3)
     poses_gt = []
     poses_res = []
+    poses_md = []
     with open(afile) as f:
         reader = csv.reader(f, delimiter=',')
         i = 0
@@ -142,24 +158,38 @@ if __name__ == '__main__':
             # Create transformation matrices
             T_gt_ = get_transform(float(row[3]), float(row[4]), float(row[5]))
             T_res_ = get_transform(float(row[0]), float(row[1]), float(row[2]))
+            T_md_ = get_transform(float(row[8]), float(row[9]), float(row[10]))
             T_gt = np.matmul(T_gt, T_gt_)
             T_res = np.matmul(T_res, T_res_)
+            T_md = np.matmul(T_md, T_md_)
 
             R_gt = T_gt[0:2,0:2]
             R_res = T_res[0:2,0:2]
+            R_md = T_md[0:2,0:2]
             if np.linalg.det(R_gt) != 1.0:
                 enforce_orthogonality(R_gt)
                 T_gt[0:2,0:2] = R_gt
             if np.linalg.det(R_res) != 1.0:
                 enforce_orthogonality(R_res)
                 T_res[0:2,0:2] = R_res
+            if np.linalg.det(R_md) != 1.0:
+                enforce_orthogonality(R_md)
+                T_md[0:2,0:2] = R_md
 
             poses_gt.append(T_gt)
             poses_res.append(T_res)
+            poses_md.append(T_md)
 
     err = calcSequenceErrors(poses_gt, poses_res)
-    saveSequenceErrors(err, 'pose_error.csv')
-    saveErrorPlots(err, 'pose_error.png')
+    err2 = calcSequenceErrors(poses_gt, poses_md)
+    saveSequenceErrors(err, 'pose_error_rigid.csv')
+    saveSequenceErrors(err2, 'pose_error_mdransac.csv')
+    saveErrorPlots([err, err2], 'pose_error.png')
     t_err, r_err = getStats(err)
+    print('RIGID:')
+    print('t_err: {} %'.format(t_err * 100))
+    print('r_err: {} deg/m'.format(r_err * 180 / np.pi))
+    t_err, r_err = getStats(err2)
+    print('MDRANSAC:')
     print('t_err: {} %'.format(t_err * 100))
     print('r_err: {} deg/m'.format(r_err * 180 / np.pi))

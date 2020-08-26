@@ -9,8 +9,9 @@
    \brief Retrieves a vector of the (radar) file names in ascending order of time stamp
    \param datadir (absolute) path to the directory that contains (radar) files
    \param radar_files [out] A vector to be filled with a string for each file name
+   \param extension Optional argument to specify the desired file extension. Files without this extension are rejected
 */
-void get_file_names(std::string datadir, std::vector<std::string> &radar_files);
+void get_file_names(std::string datadir, std::vector<std::string> &radar_files, std::string extension = "");
 
 /*!
    \brief Decode a single Oxford Radar RobotCar Dataset radar example
@@ -22,6 +23,9 @@ void get_file_names(std::string datadir, std::vector<std::string> &radar_files);
 */
 void load_radar(std::string path, std::vector<int64_t> &timestamps, std::vector<double> &azimuths,
     std::vector<bool> &valid, cv::Mat &fft_data);
+
+void load_velodyne(std::string path, std::vector<int64_t> &timestamps, std::vector<double> &azimuths,
+    Eigen::MatrixXd &pc);
 
 /*!
    \brief Decode a single Oxford Radar RobotCar Dataset radar example
@@ -43,8 +47,11 @@ void radar_polar_to_cartesian(std::vector<double> &azimuths, cv::Mat &fft_data, 
    \param radar_resolution Resolution of the polar radar data (metres per pixel)
    \param cart_points [out] Matrix of points in cartesian space (x, y) x N in metric
 */
-void polar_to_cartesian_points(std::vector<double> azimuths, Eigen::MatrixXf polar_points, float radar_resolution,
-    Eigen::MatrixXf &cart_points);
+void polar_to_cartesian_points(std::vector<double> azimuths, Eigen::MatrixXd polar_points, float radar_resolution,
+    Eigen::MatrixXd &cart_points);
+
+void polar_to_cartesian_points(std::vector<double> azimuths, std::vector<int64_t> times, Eigen::MatrixXd polar_points,
+    float radar_resolution, Eigen::MatrixXd &cart_points, std::vector<int64_t> &point_times);
 
 /*!
    \brief Converts points from metric cartesian coordinates to pixel coordinates in the BEV image
@@ -53,8 +60,11 @@ void polar_to_cartesian_points(std::vector<double> azimuths, Eigen::MatrixXf pol
    \param cart_pixel_width: Width and height of the returned square cartesian output (pixels)
    \param bev_points [out] Vector of pixel locations in the BEV cartesian image (u, v)
 */
-void convert_to_bev(Eigen::MatrixXf cart_points, float cart_resolution, int cart_pixel_width,
+void convert_to_bev(Eigen::MatrixXd &cart_points, float cart_resolution, int cart_pixel_width,
     std::vector<cv::Point2f> &bev_points);
+
+void convert_to_bev(Eigen::MatrixXd &cart_points, float cart_resolution, int cart_pixel_width, int patch_size,
+    std::vector<cv::Point2f> &bev_points, std::vector<int64_t> &point_times);
 
 
 /*!
@@ -64,7 +74,7 @@ void convert_to_bev(Eigen::MatrixXf cart_points, float cart_resolution, int cart
    \param cart_pixel_width: Width and height of the returned square cartesian output (pixels)
    \param cart_points [out] Vector of points in metric cartesian space (x, y)
 */
-void convert_bev_to_polar(Eigen::MatrixXf bev_points, float cart_resolution, int cart_pixel_width,
+void convert_from_bev(Eigen::MatrixXd bev_points, float cart_resolution, int cart_pixel_width,
     Eigen::MatrixXd &cart_points);
 
 /*!
@@ -75,7 +85,7 @@ void convert_bev_to_polar(Eigen::MatrixXf bev_points, float cart_resolution, int
    \param cart_pixel_width Width and height of the square cartesian image.
    \param vis [out] Output image with the features drawn onto it
 */
-void draw_points(cv::Mat cart_img, Eigen::MatrixXf cart_targets, float cart_resolution, int cart_pixel_width,
+void draw_points(cv::Mat cart_img, Eigen::MatrixXd cart_targets, float cart_resolution, int cart_pixel_width,
     cv::Mat &vis);
 
 /*!

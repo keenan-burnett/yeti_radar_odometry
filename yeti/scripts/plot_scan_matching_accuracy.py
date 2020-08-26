@@ -96,7 +96,7 @@ if __name__ == '__main__':
     dy = []
     dyaw = []
 
-    gpsfile = '/home/keenan/radar_ws/data/2019-01-10-14-36-48-radar-oxford-10k-partial/gps/ins.csv'
+    gpsfile = '/home/keenan/radar_ws/data/2019-01-16-14-15-33-radar-oxford-10k/gps/ins.csv'
 
     with open('accuracy.csv') as f:
         reader = csv.reader(f, delimiter=',')
@@ -105,9 +105,9 @@ if __name__ == '__main__':
             if i == 0:
                 i = 1
                 continue
-            dx.append(float(row[3]) - float(row[0]))
-            dy.append(float(row[4]) - float(row[1]))
-            dyaw.append(180 * (float(row[5]) - float(row[2])) / np.pi)
+            dx.append(float(row[3]) - float(row[8]))
+            dy.append(float(row[4]) - float(row[9]))
+            dyaw.append(180 * (float(row[5]) - float(row[10])) / np.pi)
 
     dx = np.array(dx)
     dy = np.array(dy)
@@ -135,17 +135,18 @@ if __name__ == '__main__':
 
     # Create plot of the trajectories
     T_gt = np.identity(3)
-    T_res = np.identity(3)
+    T_rigid = np.identity(3)
+    T_md = np.identity(3)
     T_gps = np.identity(3)
 
     xgt = []
     ygt = []
-    xres = []
-    yres = []
+    xrigid = []
+    yrigid = []
+    xmd = []
+    ymd = []
     xgps = []
     ygps = []
-
-    np.array([[ 0.99994504, -0.01048441, -2.29583849],[ 0.01048441,  0.99994504, -0.0159952 ],[ 0.,          0.,          1.        ]])
 
     with open('accuracy.csv') as f:
         reader = csv.reader(f, delimiter=',')
@@ -156,18 +157,24 @@ if __name__ == '__main__':
                 continue
             # Create transformation matrices
             T_gt_ = get_transform(float(row[3]), float(row[4]), float(row[5]))
-            T_res_ = get_transform(float(row[0]), float(row[1]), float(row[2]))
+            T_rigid_ = get_transform(float(row[0]), float(row[1]), float(row[2]))
+            T_md_ = get_transform(float(row[8]), float(row[9]), float(row[10]))
             T_gt = np.matmul(T_gt, T_gt_)
-            T_res = np.matmul(T_res, T_res_)
+            T_rigid = np.matmul(T_rigid, T_rigid_)
+            T_md = np.matmul(T_md, T_md_)
 
             R_gt = T_gt[0:2,0:2]
-            R_res = T_res[0:2,0:2]
+            R_rigid = T_rigid[0:2,0:2]
+            R_md = T_md[0:2,0:2]
             if np.linalg.det(R_gt) != 1.0:
                 enforce_orthogonality(R_gt)
                 T_gt[0:2,0:2] = R_gt
-            if np.linalg.det(R_res) != 1.0:
-                enforce_orthogonality(R_res)
-                T_res[0:2,0:2] = R_res
+            if np.linalg.det(R_rigid) != 1.0:
+                enforce_orthogonality(R_rigid)
+                T_rigid[0:2,0:2] = R_rigid
+            if np.linalg.det(R_md) != 1.0:
+                enforce_orthogonality(R_md)
+                T_md[0:2,0:2] = R_md
 
             # Get GPS ground truth between the frames
             time1 = int(row[6])
@@ -181,24 +188,29 @@ if __name__ == '__main__':
 
             xgt.append(T_gt[0, 2])
             ygt.append(T_gt[1, 2])
-            xres.append(T_res[0, 2])
-            yres.append(T_res[1, 2])
+            xrigid.append(T_rigid[0, 2])
+            yrigid.append(T_rigid[1, 2])
+            xmd.append(T_md[0, 2])
+            ymd.append(T_md[1, 2])
             xgps.append(T_gps[0, 2])
             ygps.append(T_gps[1, 2])
 
     xgt = np.array(xgt)
     ygt = np.array(ygt)
-    xres = np.array(xres)
-    yres = np.array(yres)
+    xrigid = np.array(xrigid)
+    yrigid = np.array(yrigid)
+    xmd = np.array(xmd)
+    ymd = np.array(ymd)
     xgps = np.array(xgps)
     ygps = np.array(ygps)
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(tight_layout=True)
     ax.set_aspect('equal')
-    ax.plot(xgt, ygt, 'b', linewidth=2, label='Ground Truth')
-    ax.plot(xres, yres, 'r', linewidth=2, label='Radar Odometry')
+    ax.plot(xgt, ygt, 'k', linewidth=2, label='Ground Truth')
+    ax.plot(xrigid, yrigid, 'r', linewidth=2, label='RIGID')
+    ax.plot(xmd, ymd, 'b', linewidth=2, label='MDRANSAC')
     ax.plot(xgps, ygps, 'g', linewidth=2, label='GPS')
     ax.set_title('Ground Truth vs. Radar Odometry (Demo Sequence)')
-    ax.legend(loc='upper left')
+    ax.legend(loc="upper left", fontsize='xx-small')
     plt.savefig('trajectory.png')
     # plt.show()
