@@ -124,9 +124,9 @@ private:
 */
 class MotionDistortedRansac {
 public:
-    MotionDistortedRansac(Eigen::MatrixXd p1, Eigen::MatrixXd p2, std::vector<int64_t> t1_, std::vector<int64_t> t2_,
-        double tolerance_, double inlier_ratio_, int iterations_) : t1(t1_), t2(t2_), tolerance(tolerance_),
-        inlier_ratio(inlier_ratio_), iterations(iterations_) {
+    MotionDistortedRansac(Eigen::MatrixXd p1, Eigen::MatrixXd p2, std::vector<int64_t> t1, std::vector<int64_t> t2,
+        double tolerance_, double inlier_ratio_, int iterations_) : tolerance(tolerance_), inlier_ratio(inlier_ratio_),
+        iterations(iterations_) {
         const int dim = p1.rows();
         assert(p1.cols() == p2.cols() && p1.rows() == p2.rows() && p1.cols() >= p1.rows() && (dim == 2 || dim == 3));
         p1bar = Eigen::MatrixXd::Zero(4, p1.cols());
@@ -141,12 +141,8 @@ public:
             p2bar.block(0, 0, 3, p2.cols()) = p2;
         }
         R_pol << pow(0.25, 2), 0, 0, 0, 0, pow(0.0157, 2), 0, 0, 0, 0, 1, 0, 0, 0, 0, 1;
-        y1bar = Eigen::MatrixXd::Zero(4, p1.cols());
-        y2bar = Eigen::MatrixXd::Zero(4, p1.cols());
         delta_ts = std::vector<double>(p1.cols(), 0.0);
         for (uint i = 0; i < p1bar.cols(); ++i) {
-            y1bar.block(0, i, 4, 1) = to_cylindrical(p1bar.block(0, i, 4, 1));
-            y2bar.block(0, i, 4, 1) = to_cylindrical(p2bar.block(0, i, 4, 1));
             int64_t delta_t = t2[i] - t1[i];
             delta_ts[i] = double(delta_t) / 1000000.0;
         }
@@ -166,16 +162,15 @@ public:
 
 private:
     Eigen::MatrixXd p1bar, p2bar;
-    Eigen::MatrixXd y1bar, y2bar;
     std::vector<double> delta_ts;
-    std::vector<int64_t> t1, t2;
     double tolerance = 0.05;
     double inlier_ratio = 0.9;
     int iterations = 40;
     int max_gn_iterations = 10;
-    double epsilon_converge = 0.01;
+    double epsilon_converge = 0.0001;
+    double error_converge = 0.01;
     int dim = 2;
-    double beta = 0.0478125;  // alpha = (f_t / (df / dt))
+    double beta = 0.0478125;  // beta = (f_t / (df / dt))
     Eigen::VectorXd w_best = Eigen::VectorXd::Zero(6);
     Eigen::Matrix4d R_pol = Eigen::Matrix4d::Identity();
     Eigen::MatrixXd get_jacobian(Eigen::Vector4d gbar);
@@ -189,8 +184,7 @@ private:
        \pre It's very important that the delt_t_local is accurate. Note that each azimuth in the radar scan is time
        stamped, this should be used to get the more accurate time differences.
     */
-    void get_motion_parameters(Eigen::MatrixXd &p1small, Eigen::MatrixXd &p2small, std::vector<double> delta_t_local,
-        Eigen::VectorXd &wbar);
+    void get_motion_parameters(std::vector<int> subset, Eigen::VectorXd &wbar);
 
     /*!
        \brief This function also computes the motion of the sensor, but it uses the linear least squares version of
@@ -203,4 +197,8 @@ private:
        \brief Retrieves the set of point pairs which are inliers given the current motion estimate.
     */
     void getInliers(Eigen::VectorXd wbar, std::vector<int> &inliers);
+
+    int getNumInliers(Eigen::VectorXd wbar);
+
+    void dopplerCorrection(Eigen::VectorXd wbar, Eigen::VectorXd &p);
 };

@@ -38,7 +38,8 @@ void load_velodyne(std::string path, std::vector<int64_t> &timestamps, std::vect
    \param cart_img [out] Cartesian radar power readings
 */
 void radar_polar_to_cartesian(std::vector<double> &azimuths, cv::Mat &fft_data, float radar_resolution,
-    float cart_resolution, int cart_pixel_width, bool interpolate_crossover, cv::Mat &cart_img);
+    float cart_resolution, int cart_pixel_width, bool interpolate_crossover, cv::Mat &cart_img,
+    int output_type = CV_32F);
 
 /*!
    \brief Converts points from polar coordinates to cartesian coordinates
@@ -60,12 +61,12 @@ void polar_to_cartesian_points(std::vector<double> azimuths, std::vector<int64_t
    \param cart_pixel_width: Width and height of the returned square cartesian output (pixels)
    \param bev_points [out] Vector of pixel locations in the BEV cartesian image (u, v)
 */
+
 void convert_to_bev(Eigen::MatrixXd &cart_points, float cart_resolution, int cart_pixel_width,
     std::vector<cv::Point2f> &bev_points);
 
 void convert_to_bev(Eigen::MatrixXd &cart_points, float cart_resolution, int cart_pixel_width, int patch_size,
-    std::vector<cv::Point2f> &bev_points, std::vector<int64_t> &point_times);
-
+    std::vector<cv::KeyPoint> &bev_points, std::vector<int64_t> &point_times);
 
 /*!
    \brief Converts points from pixel coordinates in the BEV image to metric cartesian coordinates
@@ -74,7 +75,7 @@ void convert_to_bev(Eigen::MatrixXd &cart_points, float cart_resolution, int car
    \param cart_pixel_width: Width and height of the returned square cartesian output (pixels)
    \param cart_points [out] Vector of points in metric cartesian space (x, y)
 */
-void convert_from_bev(Eigen::MatrixXd bev_points, float cart_resolution, int cart_pixel_width,
+void convert_from_bev(std::vector<cv::KeyPoint> bev_points, float cart_resolution, int cart_pixel_width,
     Eigen::MatrixXd &cart_points);
 
 /*!

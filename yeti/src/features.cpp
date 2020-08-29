@@ -90,9 +90,8 @@ void cen2018features(cv::Mat fft_data, float zq, int sigma_gauss, int min_range,
     }
 
     // Extract peak centers from each azimuth
-    std::vector<cv::Point2f> t;
-#pragma omp declare reduction(merge : std::vector<cv::Point2f> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))  // NOLINT
-#pragma omp parallel for reduction(merge: t)
+    std::vector<std::vector<cv::Point2f>> t(fft_data.rows);
+#pragma omp parallel for
     for (int i = 0; i < fft_data.rows; ++i) {
         std::vector<int> peak_points;
         float thres = zq * sigma_q[i];
@@ -104,18 +103,26 @@ void cen2018features(cv::Mat fft_data, float zq, int sigma_gauss, int min_range,
             if (y > thres) {
                 peak_points.push_back(j);
             } else if (peak_points.size() > 0) {
-                t.push_back(cv::Point(i, peak_points[peak_points.size() / 2]));
+                t[i].push_back(cv::Point(i, peak_points[peak_points.size() / 2]));
                 peak_points.clear();
             }
         }
         if (peak_points.size() > 0)
-            t.push_back(cv::Point(i, peak_points[peak_points.size() / 2]));
+            t[i].push_back(cv::Point(i, peak_points[peak_points.size() / 2]));
     }
 
-    targets = Eigen::MatrixXd::Ones(3, t.size());
+    int size = 0;
     for (uint i = 0; i < t.size(); ++i) {
-        targets(0, i) = t[i].x;
-        targets(1, i) = t[i].y;
+        size += t[i].size();
+    }
+    targets = Eigen::MatrixXd::Ones(3, size);
+    int k = 0;
+    for (uint i = 0; i < t.size(); ++i) {
+        for (uint j = 0; j < t[i].size(); ++j) {
+            targets(0, k) = t[i][j].x;
+            targets(1, k) = t[i][j].y;
+            k++;
+        }
     }
 
     auto t2 = std::chrono::high_resolution_clock::now();
@@ -236,9 +243,9 @@ void cen2019features(cv::Mat fft_data, int max_points, int min_range, Eigen::Mat
         j++;
     }
 
-    std::vector<cv::Point2f> t;
-#pragma omp declare reduction(merge : std::vector<cv::Point2f> : omp_out.insert(omp_out.end(), omp_in.begin(), omp_in.end()))  // NOLINT
-#pragma omp parallel for reduction(merge: t)
+    std::vector<std::vector<cv::Point2f>> t(fft_data.rows);
+
+#pragma omp parallel for
     for (int i = 0; i < fft_data.rows; i++) {
         // Find the continuous marked regions in each azimuth
         int start = 0;
@@ -258,17 +265,25 @@ void cen2019features(cv::Mat fft_data, int max_points, int min_range, Eigen::Mat
                 if (checkAdjacentMarked(R, i, start, end)) {
                     int max_r = start;
                     getMaxInRegion(h, i, start, end, max_r);
-                    t.push_back(cv::Point(i, max_r));
+                    t[i].push_back(cv::Point(i, max_r));
                 }
                 counting = false;
             }
         }
     }
 
-    targets = Eigen::MatrixXd::Ones(3, t.size());
+    int size = 0;
     for (uint i = 0; i < t.size(); ++i) {
-        targets(0, i) = t[i].x;
-        targets(1, i) = t[i].y;
+        size += t[i].size();
+    }
+    targets = Eigen::MatrixXd::Ones(3, size);
+    int k = 0;
+    for (uint i = 0; i < t.size(); ++i) {
+        for (uint j = 0; j < t[i].size(); ++j) {
+            targets(0, k) = t[i][j].x;
+            targets(1, k) = t[i][j].y;
+            k++;
+        }
     }
 
     auto t2 = std::chrono::high_resolution_clock::now();

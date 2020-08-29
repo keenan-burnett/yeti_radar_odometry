@@ -69,7 +69,7 @@ int main() {
     cv::Mat f1;
     std::vector<int64_t> t1;
 
-    for (uint i = 31; i < radar_files.size(); ++i) {
+    for (uint i = 35; i < radar_files.size(); ++i) {
         std::vector<std::string> parts;
         boost::split(parts, radar_files[i], boost::is_any_of("."));
         int64 time1 = std::stoll(parts[0]);
@@ -106,10 +106,10 @@ int main() {
 
         std::vector<double> x2, y2;
         for (uint j = 1; j < t1.size(); ++j) {
-            double delta_t = (t1[j] - t1[0])/1000000.0;
+            double delta_t = (t1[j] - time1)/1000000.0;
             Eigen::MatrixXd T = se3ToSE3(w_gt * delta_t);
             Eigen::Vector4d p1bar = {cart_targets(0, j), cart_targets(1, j), 0, 1};
-            p1bar = T.inverse() * p1bar;
+            p1bar = T * p1bar;
             x2.push_back(p1bar(0));
             y2.push_back(p1bar(1));
         }
@@ -130,15 +130,22 @@ int main() {
         std::vector<double> lidar_azimuths;
         Eigen::MatrixXd pc;
         load_velodyne(lidardir + "/" + lidar_files[closest_lidar], lidar_times, lidar_azimuths, pc);
+        double delta_lidar = (lidar_times[0] - time1) / 1000000.0;
+        std::cout << "min_delta: " << min_delta << std::endl;
+        // Eigen::MatrixXd T_time_offset = se3ToSE3(w_gt * delta_lidar);
+        // std::cout << T_time_offset << std::endl;
+
         // Need to transform pc into radar frame, and then remove motion distortion
         std::vector<double> x3, y3;
         for (uint j = 0; j < pc.cols(); ++j) {
             if (pc(2, j) > 1.2)
                 continue;
-            double delta_t = 0.000046296 * j;
+            // double delta_t = 0.000046296 * j;
+            double delta_t = (lidar_times[j] - time1) / 1000000.0;
+            // std::cout << delta_t << std::endl;
             Eigen::MatrixXd T = se3ToSE3(w_gt * delta_t);
             Eigen::Vector4d p1bar = {pc(0, j), pc(1, j), 0, 1};
-            p1bar = T_radar_lidar * T.inverse() * p1bar;
+            p1bar = T_radar_lidar * T * p1bar;
             x3.push_back(p1bar(0));
             y3.push_back(p1bar(1));
         }
@@ -149,7 +156,34 @@ int main() {
         std::map<std::string, std::string> kw2;
         kw2.insert(std::pair<std::string, std::string>("c", "b"));
         plt::scatter(x2, y2, 25.0, kw2);
-        plt::show();
+        // plt::show();
+
+        // Distort lidar points to be like radar points, plot on the cartesian radar image.
+        cv::Mat cart_img;
+        radar_polar_to_cartesian(azimuths, f1, radar_resolution, cart_resolution, cart_pixel_width, interp, cart_img);
+
+        Eigen::MatrixXd pc_distort = Eigen::MatrixXd::Zero(2, pc.cols());
+        for (uint j = 0; j < x3.size(); ++j) {
+            double azimuth = atan2(y3[j], x3[j]);
+            int closest = 0;
+            double diff = 1000;
+            for (uint k = 0; k < azimuths.size(); ++k) {
+                if (abs(azimuth - azimuths[k]) < diff) {
+                    diff = abs(azimuth - azimuths[k]);
+                    closest = k;
+                }
+            }
+            double delta_t = abs(t1[closest] - t1[0])/1000000.0;
+            Eigen::MatrixXd T = se3ToSE3(w_gt * delta_t);
+            Eigen::Vector4d p1bar = {x3[j], y3[j], 0, 1};
+            p1bar = T.inverse() * p1bar;
+            pc_distort(0, j) = p1bar(0);
+            pc_distort(1, j) = p1bar(1);
+        }
+        cv::Mat vis;
+        draw_points(cart_img, pc_distort, cart_resolution, cart_pixel_width, vis);
+        cv::imshow("cart", vis);
+        cv::waitKey(0);
     }
     // Extract radar keypoints
 

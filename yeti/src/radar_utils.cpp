@@ -68,20 +68,22 @@ void load_velodyne(std::string path, std::vector<int64_t> &timestamps, std::vect
     cv::Mat data = cv::imread(path, cv::IMREAD_GRAYSCALE);
     uint N = data.cols;
     cv::transpose(data, data);
-    timestamps = std::vector<int64_t>(N, 0);
-    azimuths = std::vector<double>(N, 0.0);
+    timestamps = std::vector<int64_t>(N * 32, 0);
+    azimuths = std::vector<double>(N * 32, 0.0);
     Eigen::MatrixXd ranges = Eigen::MatrixXd::Zero(N, 32);
     for (uint i = 0; i < N; ++i) {
         uchar* byteArray = data.ptr<uchar>(i);
+        uint16_t azimuth = *( (uint16_t *)(byteArray + 96));
+        double a = double(azimuth) * M_PI / 18000.0;
+        int64_t t = *((int64_t *)(byteArray + 98));
         int k = 0;
         for (uint j = 32; j < 96; j += 2) {
             uint16_t range = *( (uint16_t *)(byteArray + j));
             ranges(i, k) = double(range) * hdl32e_range_resolution;
+            azimuths[i * 32 + k] = a;
+            timestamps[i * 32 + k] = t;
             k++;
         }
-        uint16_t azimuth = *( (uint16_t *)(byteArray + 96));
-        azimuths[i] = double(azimuth) * M_PI / 18000.0;
-        timestamps[i] = *((int64_t *)(byteArray + 98));
     }
     // Convert to 3D point cloud
     std::vector<double> elevations = {-0.1862, -0.1628, -0.1396, -0.1164, -0.0930, -0.0698, -0.0466, -0.0232, 0.,
@@ -94,8 +96,8 @@ void load_velodyne(std::string path, std::vector<int64_t> &timestamps, std::vect
         for (uint j = 0; j < 32; ++j) {
             z.push_back(sin(elevations[j]) * ranges(i, j) - hdl32e_base_to_fire_height);
             double xy = cos(elevations[j]) * ranges(i, j);
-            x.push_back(sin(azimuths[i]) * xy);
-            y.push_back(-cos(azimuths[i]) * xy);
+            x.push_back(sin(azimuths[i * 32 + j]) * xy);
+            y.push_back(-cos(azimuths[i * 32 + j]) * xy);
         }
     }
     pc = Eigen::MatrixXd::Zero(3, z.size());
@@ -107,7 +109,7 @@ void load_velodyne(std::string path, std::vector<int64_t> &timestamps, std::vect
 }
 
 void radar_polar_to_cartesian(std::vector<double> &azimuths, cv::Mat &fft_data, float radar_resolution,
-    float cart_resolution, int cart_pixel_width, bool interpolate_crossover, cv::Mat &cart_img) {
+    float cart_resolution, int cart_pixel_width, bool interpolate_crossover, cv::Mat &cart_img, int output_type) {
 
     float cart_min_range = (cart_pixel_width / 2) * cart_resolution;
     if (cart_pixel_width % 2 == 0)
@@ -159,6 +161,11 @@ void radar_polar_to_cartesian(std::vector<double> &azimuths, cv::Mat &fft_data, 
         angle = angle + 1;
     }
     cv::remap(fft_data, cart_img, range, angle, cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
+    if (output_type == CV_8UC1) {
+        double min, max;
+        cv::minMaxLoc(cart_img, &min, &max);
+        cart_img.convertTo(cart_img, CV_8UC1, 255.0 / max);
+    }
 }
 
 void polar_to_cartesian_points(std::vector<double> azimuths, Eigen::MatrixXd polar_points,
@@ -206,7 +213,7 @@ void convert_to_bev(Eigen::MatrixXd &cart_points, float cart_resolution, int car
 }
 
 void convert_to_bev(Eigen::MatrixXd &cart_points, float cart_resolution, int cart_pixel_width, int patch_size,
-    std::vector<cv::Point2f> &bev_points, std::vector<int64_t> &point_times) {
+    std::vector<cv::KeyPoint> &bev_points, std::vector<int64_t> &point_times) {
     float cart_min_range = (cart_pixel_width / 2) * cart_resolution;
     if (cart_pixel_width % 2 == 0)
         cart_min_range = (cart_pixel_width / 2 - 0.5) * cart_resolution;
@@ -217,7 +224,7 @@ void convert_to_bev(Eigen::MatrixXd &cart_points, float cart_resolution, int car
         double v = (cart_min_range - cart_points(0, i)) / cart_resolution;
         if (0 < u - patch_size && u + patch_size < cart_pixel_width && 0 < v - patch_size &&
             v + patch_size < cart_pixel_width) {
-            bev_points.push_back(cv::Point2f(u, v));
+            bev_points.push_back(cv::KeyPoint(u, v, patch_size));
             point_times[j] = point_times[i];
             cart_points(0, j) = cart_points(0, i);
             cart_points(1, j) = cart_points(1, i);
@@ -228,15 +235,15 @@ void convert_to_bev(Eigen::MatrixXd &cart_points, float cart_resolution, int car
     cart_points.conservativeResize(2, bev_points.size());
 }
 
-void convert_from_bev(Eigen::MatrixXd bev_points, float cart_resolution, int cart_pixel_width,
+void convert_from_bev(std::vector<cv::KeyPoint> bev_points, float cart_resolution, int cart_pixel_width,
     Eigen::MatrixXd &cart_points) {
-    cart_points = Eigen::MatrixXd::Zero(2, bev_points.cols());
+    cart_points = Eigen::MatrixXd::Zero(2, bev_points.size());
     float cart_min_range = (cart_pixel_width / 2) * cart_resolution;
     if (cart_pixel_width % 2 == 0)
         cart_min_range = (cart_pixel_width / 2 - 0.5) * cart_resolution;
-    for (uint i = 0; i < bev_points.cols(); ++i) {
-        cart_points(0, i) = cart_min_range - cart_resolution * bev_points(1, i);
-        cart_points(1, i) = cart_resolution * bev_points(0, i) - cart_min_range;
+    for (uint i = 0; i < bev_points.size(); ++i) {
+        cart_points(0, i) = cart_min_range - cart_resolution * bev_points[i].pt.y;
+        cart_points(1, i) = cart_resolution * bev_points[i].pt.x - cart_min_range;
     }
 }
 
@@ -246,7 +253,8 @@ void draw_points(cv::Mat cart_img, Eigen::MatrixXd cart_targets, float cart_reso
     convert_to_bev(cart_targets, cart_resolution, cart_pixel_width, bev_points);
     cv::cvtColor(cart_img, vis, cv::COLOR_GRAY2BGR);
     for (cv::Point2f p : bev_points) {
-        cv::circle(vis, p, 1, cv::Scalar(0, 0, 255), -1);
+        // cv::circle(vis, p, 1, cv::Scalar(0, 0, 255), -1);
+        vis.at<cv::Vec3f>(int(p.y), int(p.x)) = cv::Vec3f(0, 0, 255);
     }
 }
 

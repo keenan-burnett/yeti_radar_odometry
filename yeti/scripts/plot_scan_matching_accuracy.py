@@ -105,9 +105,9 @@ if __name__ == '__main__':
             if i == 0:
                 i = 1
                 continue
-            dx.append(float(row[3]) - float(row[8]))
-            dy.append(float(row[4]) - float(row[9]))
-            dyaw.append(180 * (float(row[5]) - float(row[10])) / np.pi)
+            dx.append(float(row[3]) - float(row[0]))
+            dy.append(float(row[4]) - float(row[1]))
+            dyaw.append(180 * (float(row[5]) - float(row[2])) / np.pi)
 
     dx = np.array(dx)
     dy = np.array(dy)
