@@ -114,6 +114,8 @@ target_link_libraries(test_association
 	${OpenCV_LIBRARIES}
 )
 
+find_library(yaml-cpp REQUIRED)
+
 add_executable(test_feature_matching src/test_feature_matching.cpp)
 target_link_libraries(test_feature_matching
     features
@@ -121,8 +123,8 @@ target_link_libraries(test_feature_matching
     association
 	${catkin_LIBRARIES}
 	${OpenCV_LIBRARIES}
+    yaml-cpp
 )
-
 
 add_library(matplotlibcpp INTERFACE)
 target_include_directories(matplotlibcpp INTERFACE include)

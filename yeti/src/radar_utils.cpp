@@ -258,11 +258,12 @@ void draw_points(cv::Mat cart_img, Eigen::MatrixXd cart_targets, float cart_reso
     }
 }
 
-void get_groundtruth_odometry(std::string gtfile, int64 t1, int64 t2, std::vector<float> &gt) {
+bool get_groundtruth_odometry(std::string gtfile, int64 t1, int64 t2, std::vector<float> &gt) {
     std::ifstream ifs(gtfile);
     std::string line;
     std::getline(ifs, line);
     gt.clear();
+    bool gtfound = false;
     while (std::getline(ifs, line)) {
         std::vector<std::string> parts;
         boost::split(parts, line, boost::is_any_of(","));
@@ -270,7 +271,9 @@ void get_groundtruth_odometry(std::string gtfile, int64 t1, int64 t2, std::vecto
             for (int i = 2; i < 8; ++i) {
                 gt.push_back(std::stof(parts[i]));
             }
+            gtfound = true;
             break;
         }
     }
+    return gtfound;
 }

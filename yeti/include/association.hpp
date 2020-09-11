@@ -3,7 +3,10 @@
 #include <stdlib.h>
 #include <Eigen/Dense>
 #include <iostream>
+#include <fstream>
 #include <vector>
+#include <string>
+#include <chrono>
 
 /*!
    \brief Enforce orthogonality conditions on the given rotation matrix such that det(R) == 1 and R.tranpose() * R = I
@@ -82,8 +85,8 @@ class Ransac {
 public:
     // p1, p2 need to be either (x, y) x N or (x, y, z) x N (must be in homogeneous coordinates)
     Ransac(Eigen::MatrixXd p1_, Eigen::MatrixXd p2_, double tolerance_, double inlier_ratio_,
-        int iterations_) : p1(p1_), p2(p2_), tolerance(tolerance_), inlier_ratio(inlier_ratio_),
-        iterations(iterations_) {
+        int iterations_) : p1(p1_), p2(p2_), tolerance(tolerance_),
+        inlier_ratio(inlier_ratio_), iterations(iterations_) {
         int dim = p1.rows();
         assert(p1.cols() == p2.cols() && p1.rows() == p2.rows() && (dim == 2 || dim == 3));
         T_best = Eigen::MatrixXd::Identity(dim + 1, dim + 1);
@@ -96,7 +99,7 @@ public:
     /*!
        \brief Computes the transform that best aligns the two pointclouds such at T * p1 = p2
     */
-    int computeModel();
+    std::string computeModel();
 
 private:
     Eigen::MatrixXd p1, p2;
@@ -125,8 +128,8 @@ private:
 class MotionDistortedRansac {
 public:
     MotionDistortedRansac(Eigen::MatrixXd p1, Eigen::MatrixXd p2, std::vector<int64_t> t1, std::vector<int64_t> t2,
-        double tolerance_, double inlier_ratio_, int iterations_) : tolerance(tolerance_), inlier_ratio(inlier_ratio_),
-        iterations(iterations_) {
+        double tolerance_, double inlier_ratio_, int iterations_) : tolerance(tolerance_),
+        inlier_ratio(inlier_ratio_), iterations(iterations_) {
         const int dim = p1.rows();
         assert(p1.cols() == p2.cols() && p1.rows() == p2.rows() && p1.cols() >= p1.rows() && (dim == 2 || dim == 3));
         p1bar = Eigen::MatrixXd::Zero(4, p1.cols());
@@ -152,13 +155,14 @@ public:
     void setMaxIterations(int iterations_) {iterations = iterations_;}
     void setMaxGNIterations(int iterations_) {max_gn_iterations = iterations_;}
     void setConvergenceThreshold(double eps) {epsilon_converge = eps;}
+    void correctForDoppler(bool doppler_) {doppler = doppler_;}
     void getTransform(double delta_t, Eigen::MatrixXd &Tf);
     void getMotion(Eigen::VectorXd &w) {w = w_best;}
 
     /*!
        \brief Computes the ego-motion vector that best aligns the two pointclouds
     */
-    int computeModel();
+    std::string computeModel();
 
 private:
     Eigen::MatrixXd p1bar, p2bar;
@@ -171,6 +175,7 @@ private:
     double error_converge = 0.01;
     int dim = 2;
     double beta = 0.0478125;  // beta = (f_t / (df / dt))
+    bool doppler = false;
     Eigen::VectorXd w_best = Eigen::VectorXd::Zero(6);
     Eigen::Matrix4d R_pol = Eigen::Matrix4d::Identity();
     Eigen::MatrixXd get_jacobian(Eigen::Vector4d gbar);

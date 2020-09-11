@@ -41,7 +41,7 @@ void cfar1d(cv::Mat fft_data, int window_size, float scale, int guard_cells, int
 }
 
 // Runtime: 0.038s
-void cen2018features(cv::Mat fft_data, float zq, int sigma_gauss, int min_range, Eigen::MatrixXd &targets) {
+double cen2018features(cv::Mat fft_data, float zq, int sigma_gauss, int min_range, Eigen::MatrixXd &targets) {
     auto t1 = std::chrono::high_resolution_clock::now();
 
     std::vector<float> sigma_q(fft_data.rows, 0);
@@ -127,7 +127,7 @@ void cen2018features(cv::Mat fft_data, float zq, int sigma_gauss, int min_range,
 
     auto t2 = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> e = t2 - t1;
-    std::cout << "feature extraction: " << e.count() << std::endl;
+    return e.count();
 }
 
 struct Point {
@@ -189,7 +189,7 @@ static void getMaxInRegion(cv::Mat &h, int a, int start, int end, int &max_r) {
 }
 
 // Runtime: 0.050s
-void cen2019features(cv::Mat fft_data, int max_points, int min_range, Eigen::MatrixXd &targets) {
+double cen2019features(cv::Mat fft_data, int max_points, int min_range, Eigen::MatrixXd &targets) {
     auto t1 = std::chrono::high_resolution_clock::now();
     // Calculate gradient along each azimuth using the Prewitt operator
     cv::Mat prewitt = cv::Mat::zeros(1, 3, CV_32F);
@@ -288,5 +288,5 @@ void cen2019features(cv::Mat fft_data, int max_points, int min_range, Eigen::Mat
 
     auto t2 = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> e = t2 - t1;
-    std::cout << "feature extraction: " << e.count() << std::endl;
+    return e.count();
 }

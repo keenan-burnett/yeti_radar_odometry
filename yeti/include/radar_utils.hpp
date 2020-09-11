@@ -96,4 +96,4 @@ void draw_points(cv::Mat cart_img, Eigen::MatrixXd cart_targets, float cart_reso
    \param t2
    \param gt [out] Vector of floats for the ground truth transform between radar timestamp t1 and t2 (x, y, z, r, p, y)
 */
-void get_groundtruth_odometry(std::string gtfile, int64 t1, int64 t2, std::vector<float> &gt);
+bool get_groundtruth_odometry(std::string gtfile, int64 t1, int64 t2, std::vector<float> &gt);

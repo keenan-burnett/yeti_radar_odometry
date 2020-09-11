@@ -52,10 +52,10 @@ int main() {
     int min_range = 58;
     float radar_resolution = 0.0432;
     bool interp = true;
-    float zq = 3.0;
+    // float zq = 3.0;
     int max_points = 10000;
-    int sigma_gauss = 17;
-    int patch_size = 21;
+    // int sigma_gauss = 17;
+    // int patch_size = 21;
     // Get file names of the radar images
     std::vector<std::string> radar_files;
     get_file_names(radardir, radar_files);
@@ -84,8 +84,8 @@ int main() {
         double delta_t = (time2 - time1) / 1000000.0;
         w_gt /= delta_t;
 
-        // if (fabs(w_gt(0)) < 2.0)
-            // continue;
+        if (fabs(w_gt(0)) < 9.0)
+            continue;
 
         std::cout << "radar file: " << i << std::endl;
         std::cout << "time: " << time1 << std::endl;
@@ -130,7 +130,7 @@ int main() {
         std::vector<double> lidar_azimuths;
         Eigen::MatrixXd pc;
         load_velodyne(lidardir + "/" + lidar_files[closest_lidar], lidar_times, lidar_azimuths, pc);
-        double delta_lidar = (lidar_times[0] - time1) / 1000000.0;
+        // double delta_lidar = (lidar_times[0] - time1) / 1000000.0;
         std::cout << "min_delta: " << min_delta << std::endl;
         // Eigen::MatrixXd T_time_offset = se3ToSE3(w_gt * delta_lidar);
         // std::cout << T_time_offset << std::endl;

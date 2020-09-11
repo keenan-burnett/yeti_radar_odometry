@@ -125,6 +125,7 @@ Eigen::Matrix4d se3ToSE3(Eigen::MatrixXd xi) {
         phibar.normalize();
         Eigen::Matrix3d I = Eigen::Matrix3d::Identity();
         C = cos(phi) * I + (1 - cos(phi)) * phibar * phibar.transpose() + sin(phi) * cross(phibar);
+        enforce_orthogonality(C);
         Eigen::Matrix3d J = I * sin(phi) / phi + (1 - sin(phi) / phi) * phibar * phibar.transpose() +
             cross(phibar) * (1 - cos(phi)) / phi;
         rho = J * rho;
@@ -191,7 +192,7 @@ double wrapto2pi(double theta) {
     }
 }
 
-int Ransac::computeModel() {
+std::string Ransac::computeModel() {
     uint max_inliers = 0;
     std::vector<int> best_inliers;
     int dim = p1.rows();
@@ -230,9 +231,10 @@ int Ransac::computeModel() {
         p2small.block(0, j, dim, 1) = p2.block(0, best_inliers[j], dim, 1);
     }
     get_rigid_transform(p1small, p2small, T_best);
-    std::cout << "iterations: " << i << std::endl;
-    std::cout << "inlier ratio: " << double(max_inliers) / double(p1.cols()) << std::endl;
-    return max_inliers;
+    std::stringstream ss;
+    ss << "RANSAC iterations: " << i << std::endl;
+    ss << "RANSAC inlier ratio: " << double(max_inliers) / double(p1.cols()) << std::endl;
+    return ss.str();
 }
 
 void Ransac::getInliers(Eigen::MatrixXd Tf, std::vector<int> &inliers) {
@@ -315,8 +317,10 @@ void MotionDistortedRansac::get_motion_parameters(std::vector<int> subset, Eigen
             Eigen::MatrixXd Tbar = se3ToSE3(delta_ts[subset[m]] * wbar);
             Eigen::VectorXd p1 = p1bar.col(subset[m]);
             Eigen::VectorXd p2 = p2bar.col(subset[m]);
-            // dopplerCorrection(wbar, p1);
-            // dopplerCorrection(wbar, p2);
+            if (doppler) {
+                dopplerCorrection(wbar, p1);
+                dopplerCorrection(wbar, p2);
+            }
             Eigen::VectorXd gbar = Tbar * p1;
             Eigen::MatrixXd G = delta_ts[subset[m]] * circledot(gbar);
             Eigen::VectorXd ebar = p2 - gbar;
@@ -335,11 +339,13 @@ void MotionDistortedRansac::get_motion_parameters(std::vector<int> subset, Eigen
         for (double alpha = 0.1; alpha <= 1.0; alpha += 0.1) {
             double e = 0;
             Eigen::VectorXd wbar_temp = wbar + alpha * delta_w;
-            for (int m = 0; m < subset.size(); ++m) {
+            for (uint m = 0; m < subset.size(); ++m) {
                 Eigen::VectorXd p1 = p1bar.col(subset[m]);
                 Eigen::VectorXd p2 = p2bar.col(subset[m]);
-                // dopplerCorrection(wbar, p1);
-                // dopplerCorrection(wbar, p2);
+                if (doppler) {
+                    dopplerCorrection(wbar, p1);
+                    dopplerCorrection(wbar, p2);
+                }
                 Eigen::MatrixXd Tbar = se3ToSE3(delta_ts[subset[m]] * wbar_temp);
                 Eigen::VectorXd ebar = p2 - Tbar * p1;
                 e += ebar.squaredNorm();
@@ -378,8 +384,10 @@ void MotionDistortedRansac::getInliers(Eigen::VectorXd wbar, std::vector<int> &i
     for (uint i = 0; i < p1bar.cols(); ++i) {
         Eigen::VectorXd p2 = p2bar.block(0, i, 4, 1);
         Eigen::VectorXd p1 = p1bar.block(0, i, 4, 1);
-        // dopplerCorrection(wbar, p1);
-        // dopplerCorrection(wbar, p2);
+        if (doppler) {
+            dopplerCorrection(wbar, p1);
+            dopplerCorrection(wbar, p2);
+        }
         Eigen::MatrixXd Tm = se3ToSE3(delta_ts[i] * wbar);
         Eigen::VectorXd error = p2 - Tm * p1;
         if (error.squaredNorm() < tolerance)
@@ -392,8 +400,10 @@ int MotionDistortedRansac::getNumInliers(Eigen::VectorXd wbar) {
     for (uint i = 0; i < p1bar.cols(); ++i) {
         Eigen::VectorXd p2 = p2bar.block(0, i, 4, 1);
         Eigen::VectorXd p1 = p1bar.block(0, i, 4, 1);
-        // dopplerCorrection(wbar, p1);
-        // dopplerCorrection(wbar, p2);
+        if (doppler) {
+            dopplerCorrection(wbar, p1);
+            dopplerCorrection(wbar, p2);
+        }
         Eigen::MatrixXd Tm = se3ToSE3(delta_ts[i] * wbar);
         Eigen::VectorXd error = p2 - Tm * p1;
         if (error.squaredNorm() < tolerance)
@@ -406,7 +416,8 @@ void MotionDistortedRansac::getTransform(double delta_t, Eigen::MatrixXd &Tf) {
     Tf = se3ToSE3(w_best * delta_t);
 }
 
-int MotionDistortedRansac::computeModel() {
+std::string MotionDistortedRansac::computeModel() {
+    auto start = std::chrono::high_resolution_clock::now();
     int max_inliers = 0;
     int subset_size = 2;
     int i = 0;
@@ -428,7 +439,11 @@ int MotionDistortedRansac::computeModel() {
     std::vector<int> best_inliers;
     getInliers(w_best, best_inliers);
     get_motion_parameters(best_inliers, w_best);
-    std::cout << "iterations: " << i << std::endl;
-    std::cout << "inlier ratio: " << double(best_inliers.size()) / double(p1bar.cols()) << std::endl;
-    return best_inliers.size();
+    auto stop = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> e = stop - start;
+    std::stringstream ss;
+    ss << "MDRANSAC iterations: " << i << std::endl;
+    ss << "MDRANSAC inlier ratio: " << double(best_inliers.size()) / double(p1bar.cols()) << std::endl;
+    ss << "MDRANSAC runtime: " << e.count() << std::endl;
+    return ss.str();
 }

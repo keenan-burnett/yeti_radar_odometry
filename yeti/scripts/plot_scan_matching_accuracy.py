@@ -90,54 +90,196 @@ def extract_translation(T):
     t = np.matmul(-R.transpose(), t)
     return t[0], t[1]
 
-if __name__ == '__main__':
+def remove_unlikely_data(counts, dt, dr, min_remove=10):
+    remove = 0
+    for i in range(counts.shape[0] - 1, 0, -1):
+        if counts[i] < min_remove:
+            remove += 1
+        else:
+            break
+    if remove > 0:
+        counts = counts[:-remove]
+        dt = dt[:-remove]
+        dr = dr[:-remove]
+    return counts, dt, dr
 
-    dx = []
-    dy = []
-    dyaw = []
+if __name__ == '__main__':
+    speed = []
+    omega = []
+    dt_rigid = []
+    dr_rigid = []
+    dt_md = []
+    dr_md = []
+    dt_dopp = []
+    dr_dopp = []
 
     gpsfile = '/home/keenan/radar_ws/data/2019-01-16-14-15-33-radar-oxford-10k/gps/ins.csv'
 
-    with open('accuracy.csv') as f:
-        reader = csv.reader(f, delimiter=',')
-        i = 0
-        for row in reader:
-            if i == 0:
-                i = 1
+    outlier_count = 0
+
+    threshold = 2.0
+
+    with open('accuracy.csv', 'r') as f:
+        f.readline()
+        for line in f:
+            row = line.split(',')
+            dtr = np.sqrt((float(row[3]) - float(row[0]))**2 + (float(row[4]) - float(row[1]))**2)
+            dtmd = np.sqrt((float(row[3]) - float(row[8]))**2 + (float(row[4]) - float(row[9]))**2)
+            # dtd = np.sqrt((float(row[3]) - float(row[11]))**2 + (float(row[4]) - float(row[12]))**2)
+            if dtr > threshold or dtmd > threshold: # or dtd > threshold:
+                outlier_count += 1
                 continue
-            dx.append(float(row[3]) - float(row[0]))
-            dy.append(float(row[4]) - float(row[1]))
-            dyaw.append(180 * (float(row[5]) - float(row[2])) / np.pi)
 
-    dx = np.array(dx)
-    dy = np.array(dy)
-    dyaw = np.array(dyaw)
+            dt_rigid.append(dtr)
+            dr_rigid.append(180 * abs(float(row[5]) - float(row[2])) / np.pi)
+            dt_md.append(dtmd)
+            dr_md.append(180 * abs(float(row[5]) - float(row[10])) / np.pi)
+            # dt_dopp.append(dtd)
+            # dr_dopp.append(180 * abs(float(row[5]) - float(row[13])) / np.pi)
+            time1 = float(row[6])
+            time2 = float(row[7])
+            delta_t = (time2 - time1) / 1000000.0
+            speed.append(np.sqrt(float(row[3])**2 + float(row[4])**2) / delta_t)
+            omega.append(abs(float(row[5])) / delta_t)
 
-    dr = np.sqrt(dx**2 + dy**2)
-    print('translation error:')
-    print(np.mean(dr))
-    print(np.median(dr))
-    print(np.sqrt(np.mean((dr - np.median(dr))**2)))
-    print('rotation error:')
-    print(np.mean(dyaw))
-    print(np.median(dyaw))
-    print(np.sqrt(np.mean((dyaw - np.median(dyaw))**2)))
+    print('outliers: {} / {}'.format(outlier_count, len(speed)))
 
-    fig, axs = plt.subplots(1, 3, sharey=True, tight_layout=True, figsize=(16, 5))
-    axs[0].hist(dx, bins=20)
-    axs[0].set_title('Translation Error X (m)')
-    axs[1].hist(dy, bins=20)
-    axs[1].set_title('Translation Error Y (m)')
-    axs[2].hist(dyaw, bins=20)
-    axs[2].set_title('Rotation Error Yaw (deg)')
+    dt_rigid = np.array(dt_rigid)
+    dr_rigid = np.array(dr_rigid)
+    dt_md = np.array(dt_md)
+    dr_md = np.array(dr_md)
+    # dt_dopp = np.array(dt_dopp)
+    # dr_dopp = np.array(dr_dopp)
+    speed = np.array(speed)
+    omega = np.array(omega)
 
-    plt.savefig('accuracy_hist.png')
+    print('RIGID: dt: {} sigma_dt: {} dr: {} sigma_dr: {}'.format(np.median(dt_rigid), np.mean((dt_rigid - np.median(dt_rigid))**2), np.median(dr_rigid), np.mean((dr_rigid - np.median(dr_rigid))**2)))
+    print('MDRANSAC: dt: {} sigma_dt: {} dr: {} sigma_dr: {}'.format(np.median(dt_md), np.mean((dt_md - np.median(dt_md))**2), np.median(dr_md), np.mean((dt_md - np.median(dt_md))**2)))
+    # print('MDRANSAC + DOPPLER: dt: {} sigma_dt: {} dr: {} sigma_dr: {}'.format(np.median(dt_dopp), np.mean((dt_dopp - np.median(dt_dopp))**2), np.median(dr_dopp), np.mean((dt_dopp - np.median(dt_dopp))**2)))
+
+    fig, axs = plt.subplots(1, 2, tight_layout=True, figsize=(12, 5))
+    axs[0].set_title('Translation Error (m) vs. Speed (m/s)')
+    axs[1].set_title('Rotation Error (deg) vs. Speed (m/s)')
+
+    max_speed = int(np.ceil(max(speed)))
+
+    t_bins = np.zeros((max_speed))
+    r_bins = np.zeros((max_speed))
+    counts = np.zeros((max_speed))
+    for j in range(0, speed.shape[0]):
+        bin = int(np.floor(speed[j]))
+        t_bins[bin] += dt_rigid[j]
+        r_bins[bin] += dr_rigid[j]
+        counts[bin] += 1
+    counts, t_bins, r_bins = remove_unlikely_data(counts, t_bins, r_bins)
+    t_bins /= counts
+    r_bins /= counts
+
+    axs[0].plot(t_bins, 'ob-', label='RIGID', linewidth=2)
+    axs[1].plot(r_bins, 'ob-', label='RIGID', linewidth=2)
+
+    t_bins = np.zeros((max_speed))
+    r_bins = np.zeros((max_speed))
+    counts = np.zeros((max_speed))
+    for j in range(0, speed.shape[0]):
+        bin = int(np.floor(speed[j]))
+        t_bins[bin] += dt_md[j]
+        r_bins[bin] += dr_md[j]
+        counts[bin] += 1
+    counts, t_bins, r_bins = remove_unlikely_data(counts, t_bins, r_bins)
+    t_bins /= counts
+    r_bins /= counts
+    axs[0].plot(t_bins, 'or-', label='MDRANSAC', linewidth=2)
+    axs[1].plot(r_bins, 'or-', label='MDRANSAC', linewidth=2)
+
+    # t_bins = np.zeros((max_speed))
+    # r_bins = np.zeros((max_speed))
+    # counts = np.zeros((max_speed))
+    # for j in range(0, speed.shape[0]):
+    #     bin = int(np.floor(speed[j]))
+    #     t_bins[bin] += dt_dopp[j]
+    #     r_bins[bin] += dr_dopp[j]
+    #     counts[bin] += 1
+    #
+    # t_bins /= counts
+    # r_bins /= counts
+    # counts, t_bins, r_bins = remove_unlikely_data(counts, t_bins, r_bins)
+    # axs[0].plot(t_bins, 'og-', label='MDRANSAC+Doppler', linewidth=2)
+    # axs[1].plot(r_bins, 'og-', label='MDRANSAC+Doppler', linewidth=2)
+
+    for item in ([axs[0].title, axs[0].xaxis.label, axs[0].yaxis.label] + axs[0].get_xticklabels() + axs[0].get_yticklabels()):
+        item.set_fontsize(15)
+    for item in ([axs[1].title, axs[1].xaxis.label, axs[1].yaxis.label] + axs[1].get_xticklabels() + axs[1].get_yticklabels()):
+        item.set_fontsize(15)
+
+    axLine, axLabel = axs[0].get_legend_handles_labels()
+    fig.legend(axLine, axLabel, bbox_to_anchor=(0.20, 0.90), fontsize='x-small')
+    # plt.show()
+
+    plt.savefig('accuracy_vs_speed.png')
+
+    # Error vs. Angular Velocity
+
+    fig, axs = plt.subplots(1, 2, tight_layout=True, figsize=(12, 5))
+    axs[0].set_title('Translation Error (m) vs. Ang Vel (rad/s)')
+    axs[1].set_title('Rotation Error (deg) vs. Ang Vel (rad/s)')
+
+    max_omega = max(omega)
+    num_bins = 10
+    omegabins = np.arange(0, max_omega, step = max_omega / num_bins)
+
+
+    def get_bin(x, highest, num_bins):
+        bin_width = highest / num_bins
+        bin = int(np.floor(abs(x) / bin_width))
+        if bin >= num_bins:
+            bin = num_bins - 1
+        return bin
+
+    t_bins = np.zeros((num_bins))
+    r_bins = np.zeros((num_bins))
+    counts = np.zeros((num_bins))
+    for j in range(0, omega.shape[0]):
+        bin = get_bin(omega[j], max_omega, num_bins)
+        t_bins[bin] += dt_rigid[j]
+        r_bins[bin] += dr_rigid[j]
+        counts[bin] += 1
+    print(counts)
+    # counts, t_bins, r_bins = remove_unlikely_data(counts, t_bins, r_bins)
+    t_bins /= counts
+    r_bins /= counts
+
+    print(t_bins.shape)
+    print(omegabins.shape)
+
+    axs[0].plot(omegabins, t_bins, 'ob-', label='RIGID', linewidth=2)
+    axs[1].plot(omegabins, r_bins, 'ob-', label='RIGID', linewidth=2)
+
+    t_bins = np.zeros((num_bins))
+    r_bins = np.zeros((num_bins))
+    counts = np.zeros((num_bins))
+    for j in range(0, omega.shape[0]):
+        bin = get_bin(omega[j], max_omega, num_bins)
+        t_bins[bin] += dt_md[j]
+        r_bins[bin] += dr_md[j]
+        counts[bin] += 1
+    # counts, t_bins, r_bins = remove_unlikely_data(counts, t_bins, r_bins)
+    t_bins /= counts
+    r_bins /= counts
+
+    axs[0].plot(omegabins, t_bins, 'or-', label='MDRANSAC', linewidth=2)
+    axs[1].plot(omegabins, r_bins, 'or-', label='MDRANSAC', linewidth=2)
+
+    plt.show()
+
+
 
     # Create plot of the trajectories
     T_gt = np.identity(3)
     T_rigid = np.identity(3)
     T_md = np.identity(3)
     T_gps = np.identity(3)
+    T_dopp = np.identity(3)
 
     xgt = []
     ygt = []
@@ -147,6 +289,8 @@ if __name__ == '__main__':
     ymd = []
     xgps = []
     ygps = []
+    xdopp = []
+    ydopp = []
 
     with open('accuracy.csv') as f:
         reader = csv.reader(f, delimiter=',')
@@ -159,13 +303,16 @@ if __name__ == '__main__':
             T_gt_ = get_transform(float(row[3]), float(row[4]), float(row[5]))
             T_rigid_ = get_transform(float(row[0]), float(row[1]), float(row[2]))
             T_md_ = get_transform(float(row[8]), float(row[9]), float(row[10]))
+            T_dopp_ = get_transform(float(row[11]), float(row[12]), float(row[13]))
             T_gt = np.matmul(T_gt, T_gt_)
             T_rigid = np.matmul(T_rigid, T_rigid_)
             T_md = np.matmul(T_md, T_md_)
+            T_dopp = np.matmul(T_dopp, T_dopp_)
 
             R_gt = T_gt[0:2,0:2]
             R_rigid = T_rigid[0:2,0:2]
             R_md = T_md[0:2,0:2]
+            R_dopp = T_dopp[0:2,0:2]
             if np.linalg.det(R_gt) != 1.0:
                 enforce_orthogonality(R_gt)
                 T_gt[0:2,0:2] = R_gt
@@ -175,6 +322,9 @@ if __name__ == '__main__':
             if np.linalg.det(R_md) != 1.0:
                 enforce_orthogonality(R_md)
                 T_md[0:2,0:2] = R_md
+            if np.linalg.det(R_dopp) != 1.0:
+                enforce_orthogonality(R_dopp)
+                T_dopp[0:2,0:2] = R_dopp
 
             # Get GPS ground truth between the frames
             time1 = int(row[6])
@@ -194,6 +344,8 @@ if __name__ == '__main__':
             ymd.append(T_md[1, 2])
             xgps.append(T_gps[0, 2])
             ygps.append(T_gps[1, 2])
+            xdopp.append(T_dopp[0, 2])
+            ydopp.append(T_dopp[1, 2])
 
     xgt = np.array(xgt)
     ygt = np.array(ygt)
@@ -203,6 +355,8 @@ if __name__ == '__main__':
     ymd = np.array(ymd)
     xgps = np.array(xgps)
     ygps = np.array(ygps)
+    xdopp = np.array(xdopp)
+    ydopp = np.array(ydopp)
 
     fig, ax = plt.subplots(tight_layout=True)
     ax.set_aspect('equal')
