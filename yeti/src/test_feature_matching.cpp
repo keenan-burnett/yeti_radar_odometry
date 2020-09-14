@@ -33,7 +33,11 @@ int main(int argc, char *argv[]) {
     std::string sequence = "2019-01-10-14-36-48-radar-oxford-10k-partial";
     if (argc > 1)
         sequence = argv[1];
+    std::string append = "";
+    if (argc > 2)
+        append = argv[2];
     std::cout << sequence << std::endl;
+    std::cout << append << std::endl;
     std::string datadir = root + sequence + "/radar";
     std::string gt = root + sequence + "/gt/radar_odometry.csv";
     YAML::Node node = YAML::LoadFile("/home/keenan/radar_ws/src/yeti/yeti/config/feature_matching.yaml");
@@ -61,7 +65,7 @@ int main(int argc, char *argv[]) {
     get_file_names(datadir, radar_files);
     // File for storing the results of estimation on each frame (and the accuracy)
     std::ofstream ofs;
-    ofs.open("accuracy.csv", std::ios::out);
+    ofs.open("accuracy" + append + ".csv", std::ios::out);
     ofs << "x,y,yaw,gtx,gty,gtyaw,time1,time2,xmd,ymd,yawmd,xdopp,ydopp,yawdopp\n";
     std::ofstream log;
     log.open("log.txt", std::ios::out);
@@ -180,7 +184,7 @@ int main(int argc, char *argv[]) {
         // Retrieve the ground truth to calculate accuracy
         std::vector<float> gtvec;
         if (!get_groundtruth_odometry(gt, time1, time2, gtvec)) {
-            std::cout << "ground truth odometry for " << time1 << " " << time2 << " not found." << std::endl;
+            std::cout << "ground truth odometry for " << time1 << " " << time2 << " not found... exiting." << std::endl;
             return 0;
         }
         float yaw = -1 * asin(T(0, 1));

@@ -123,6 +123,11 @@ def saveErrorPlots(errlist, filename):
             axs[0, 1].plot(lengths[:l], r_len_err, 'Dr-', label='MDRANSAC')
             axs[1, 0].plot(vx[:m], t_vel_err, 'Dr-', label='MDRANSAC')
             axs[1, 1].plot(vx[:m], r_vel_err, 'Dr-', label='MDRANSAC')
+        if j == 2:
+            axs[0, 0].plot(lengths[:l], t_len_err, 'og-', label='DOPPLER')
+            axs[0, 1].plot(lengths[:l], r_len_err, 'og-', label='DOPPLER')
+            axs[1, 0].plot(vx[:m], t_vel_err, 'og-', label='DOPPLER')
+            axs[1, 1].plot(vx[:m], r_vel_err, 'og-', label='DOPPLER')
 
     axLine, axLabel = axs[0, 0].get_legend_handles_labels()
 
@@ -145,9 +150,11 @@ if __name__ == '__main__':
     T_gt = np.identity(3)
     T_res = np.identity(3)
     T_md = np.identity(3)
+    T_dopp = np.identity(3)
     poses_gt = []
     poses_res = []
     poses_md = []
+    poses_dopp = []
     with open(afile) as f:
         reader = csv.reader(f, delimiter=',')
         i = 0
@@ -159,13 +166,16 @@ if __name__ == '__main__':
             T_gt_ = get_transform(float(row[3]), float(row[4]), float(row[5]))
             T_res_ = get_transform(float(row[0]), float(row[1]), float(row[2]))
             T_md_ = get_transform(float(row[8]), float(row[9]), float(row[10]))
+            T_dopp_ = get_transform(float(row[11]), float(row[12]), float(row[13]))
             T_gt = np.matmul(T_gt, T_gt_)
             T_res = np.matmul(T_res, T_res_)
             T_md = np.matmul(T_md, T_md_)
+            T_dopp = np.matmul(T_dopp, T_dopp_)
 
             R_gt = T_gt[0:2,0:2]
             R_res = T_res[0:2,0:2]
             R_md = T_md[0:2,0:2]
+            R_dopp = T_dopp[0:2,0:2]
             if np.linalg.det(R_gt) != 1.0:
                 enforce_orthogonality(R_gt)
                 T_gt[0:2,0:2] = R_gt
@@ -175,21 +185,31 @@ if __name__ == '__main__':
             if np.linalg.det(R_md) != 1.0:
                 enforce_orthogonality(R_md)
                 T_md[0:2,0:2] = R_md
+            if np.linalg.det(R_dopp) != 1.0:
+                enforce_orthogonality(R_dopp)
+                T_dopp[0:2,0:2] = R_dopp
 
             poses_gt.append(T_gt)
             poses_res.append(T_res)
             poses_md.append(T_md)
+            poses_dopp.append(T_dopp)
 
     err = calcSequenceErrors(poses_gt, poses_res)
     err2 = calcSequenceErrors(poses_gt, poses_md)
+    err3 = calcSequenceErrors(poses_gt, poses_dopp)
     saveSequenceErrors(err, 'pose_error_rigid.csv')
     saveSequenceErrors(err2, 'pose_error_mdransac.csv')
-    saveErrorPlots([err, err2], 'pose_error.png')
+    saveSequenceErrors(err3, 'pose_error_dopp.csv')
+    saveErrorPlots([err, err2, err3], 'pose_error.png')
     t_err, r_err = getStats(err)
     print('RIGID:')
     print('t_err: {} %'.format(t_err * 100))
     print('r_err: {} deg/m'.format(r_err * 180 / np.pi))
     t_err, r_err = getStats(err2)
     print('MDRANSAC:')
+    print('t_err: {} %'.format(t_err * 100))
+    print('r_err: {} deg/m'.format(r_err * 180 / np.pi))
+    t_err, r_err = getStats(err3)
+    print('DOPPLER:')
     print('t_err: {} %'.format(t_err * 100))
     print('r_err: {} deg/m'.format(r_err * 180 / np.pi))
