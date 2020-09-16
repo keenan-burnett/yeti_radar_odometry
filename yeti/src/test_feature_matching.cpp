@@ -10,6 +10,7 @@
 #include "radar_utils.hpp"
 #include "features.hpp"
 #include "association.hpp"
+#include <omp.h>
 
 void getTimes(Eigen::MatrixXd cart_targets, std::vector<double> azimuths, std::vector<int64_t> times,
     std::vector<int64_t> &tout) {
@@ -29,7 +30,8 @@ void getTimes(Eigen::MatrixXd cart_targets, std::vector<double> azimuths, std::v
 }
 
 int main(int argc, char *argv[]) {
-    std::string root = "/home/keenan/Documents/data/";
+    // std::string root = "/home/keenan/Documents/data/";
+    std::string root = "/workspace/raid/krb/oxford-radar-robotcar-dataset/";
     std::string sequence = "2019-01-10-14-36-48-radar-oxford-10k-partial";
     if (argc > 1)
         sequence = argv[1];
@@ -38,9 +40,11 @@ int main(int argc, char *argv[]) {
         append = argv[2];
     std::cout << sequence << std::endl;
     std::cout << append << std::endl;
+    omp_set_num_threads(8);
     std::string datadir = root + sequence + "/radar";
     std::string gt = root + sequence + "/gt/radar_odometry.csv";
-    YAML::Node node = YAML::LoadFile("/home/keenan/radar_ws/src/yeti/yeti/config/feature_matching.yaml");
+    // YAML::Node node = YAML::LoadFile("/home/keenan/radar_ws/src/yeti/yeti/config/feature_matching.yaml");
+    YAML::Node node = YAML::LoadFile("/workspace/Documents/catkin_ws/src/yeti/yeti/config/feature_matching.yaml");
 
     float cart_resolution = node["cart_resolution"].as<float>();
     int cart_pixel_width = node["cart_pixel_width"].as<int>();
@@ -68,7 +72,7 @@ int main(int argc, char *argv[]) {
     ofs.open("accuracy" + append + ".csv", std::ios::out);
     ofs << "x,y,yaw,gtx,gty,gtyaw,time1,time2,xmd,ymd,yawmd,xdopp,ydopp,yawdopp\n";
     std::ofstream log;
-    log.open("log.txt", std::ios::out);
+    log.open("log" + append + ".txt", std::ios::out);
     log << sequence << "\n";
     log << node << "\n";
     // Create ORB feature detector
