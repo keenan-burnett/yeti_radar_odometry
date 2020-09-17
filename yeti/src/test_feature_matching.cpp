@@ -30,8 +30,8 @@ void getTimes(Eigen::MatrixXd cart_targets, std::vector<double> azimuths, std::v
 }
 
 int main(int argc, char *argv[]) {
-    // std::string root = "/home/keenan/Documents/data/";
-    std::string root = "/workspace/raid/krb/oxford-radar-robotcar-dataset/";
+    std::string root = "/home/keenan/Documents/data/";
+    // std::string root = "/workspace/raid/krb/oxford-radar-robotcar-dataset/";
     std::string sequence = "2019-01-10-14-36-48-radar-oxford-10k-partial";
     if (argc > 1)
         sequence = argv[1];
@@ -43,8 +43,8 @@ int main(int argc, char *argv[]) {
     omp_set_num_threads(8);
     std::string datadir = root + sequence + "/radar";
     std::string gt = root + sequence + "/gt/radar_odometry.csv";
-    // YAML::Node node = YAML::LoadFile("/home/keenan/radar_ws/src/yeti/yeti/config/feature_matching.yaml");
-    YAML::Node node = YAML::LoadFile("/workspace/Documents/catkin_ws/src/yeti/yeti/config/feature_matching.yaml");
+    YAML::Node node = YAML::LoadFile("/home/keenan/radar_ws/src/yeti/yeti/config/feature_matching.yaml");
+    // YAML::Node node = YAML::LoadFile("/workspace/Documents/catkin_ws/src/yeti/yeti/config/feature_matching.yaml");
 
     float cart_resolution = node["cart_resolution"].as<float>();
     int cart_pixel_width = node["cart_pixel_width"].as<int>();
@@ -61,8 +61,8 @@ int main(int argc, char *argv[]) {
     int max_iterations = node["max_iterations"].as<int>();
     int max_gn_iterations = node["max_gn_iterations"].as<int>();
     double md_threshold = node["md_threshold"].as<double>();
-    // bool doppler = node["doppler"].as<bool>();
     int keypoint_extraction = node["keypoint_extraction"].as<int>();
+    double beta = node["beta"].as<double>();
 
     // Get file names of the radar images
     std::vector<std::string> radar_files;
@@ -178,6 +178,7 @@ int main(int argc, char *argv[]) {
 
         // MDRANSAC + Doppler
         mdransac.correctForDoppler(true);
+        mdransac.setDopplerParameter(beta);
         srand(i);
         log << "***DOPPLER***" << std::endl;
         log << mdransac.computeModel();

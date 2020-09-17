@@ -43,7 +43,7 @@ Eigen::Matrix4d get_transform_from_file(std::string path) {
 }
 
 int main() {
-    std::string root = "/home/keenan/Documents/data/2019-01-10-14-36-48-radar-oxford-10k-partial";
+    std::string root = "/home/keenan/Documents/data/2019-01-16-14-15-33-radar-oxford-10k";
     std::string radardir = root + "/radar";
     std::string lidardir = root + "/velodyne_right";
     std::string gt = root + "/gt/radar_odometry.csv";

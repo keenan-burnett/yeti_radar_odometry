@@ -158,6 +158,7 @@ public:
     void correctForDoppler(bool doppler_) {doppler = doppler_;}
     void getTransform(double delta_t, Eigen::MatrixXd &Tf);
     void getMotion(Eigen::VectorXd &w) {w = w_best;}
+    void setDopplerParameter(double beta_) {beta = beta_;}
 
     /*!
        \brief Computes the ego-motion vector that best aligns the two pointclouds
@@ -174,7 +175,7 @@ private:
     double epsilon_converge = 0.0001;
     double error_converge = 0.01;
     int dim = 2;
-    double beta = 0.0478125;  // beta = (f_t / (df / dt))
+    double beta = -0.0478125;  // beta = (f_t / (df / dt))
     bool doppler = false;
     Eigen::VectorXd w_best = Eigen::VectorXd::Zero(6);
     Eigen::Matrix4d R_pol = Eigen::Matrix4d::Identity();

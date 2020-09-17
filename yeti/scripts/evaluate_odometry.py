@@ -1,5 +1,6 @@
 import numpy as np
 import csv
+import sys
 import matplotlib.pyplot as plt
 from plot_scan_matching_accuracy import *
 
@@ -147,6 +148,10 @@ def getStats(err):
 
 if __name__ == '__main__':
     afile = 'accuracy.csv'
+    if len(sys.argv) > 1:
+        afile = sys.argv[1]
+    print(afile)
+
     T_gt = np.identity(3)
     T_res = np.identity(3)
     T_md = np.identity(3)
