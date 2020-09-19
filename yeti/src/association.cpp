@@ -432,8 +432,8 @@ std::string MotionDistortedRansac::computeModel() {
             max_inliers = inliers;
             w_best = wbar;
         }
-        if (double(inliers) / double(p1bar.cols()) > inlier_ratio)
-            break;
+        // if (double(inliers) / double(p1bar.cols()) > inlier_ratio)
+            // break;
     }
     // Refine transformation using the inlier set
     std::vector<int> best_inliers;

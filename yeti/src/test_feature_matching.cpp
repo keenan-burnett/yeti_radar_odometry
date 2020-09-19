@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
             runtime = cen2018features(fft_data, zq, sigma_gauss, min_range, targets);
         if (keypoint_extraction == 1)
             runtime = cen2019features(fft_data, max_points, min_range, targets);
-        log << "feature extraction: " << runtime << std::endl;
+        // log << "feature extraction: " << runtime << std::endl;
         if (keypoint_extraction == 0 || keypoint_extraction == 1) {
             polar_to_cartesian_points(azimuths, times, targets, radar_resolution, cart_targets2, t2);
             convert_to_bev(cart_targets2, cart_resolution, cart_pixel_width, patch_size, kp2, t2);
@@ -157,31 +157,28 @@ int main(int argc, char *argv[]) {
         double delta_t = (time2 - time1) / 1000000.0;
 
         // Compute the transformation using RANSAC
-        Ransac ransac(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
-        srand(i);
-        log << ransac.computeModel();
+        // Ransac ransac(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
+        // srand(i);
+        // ransac.computeModel();
         Eigen::MatrixXd T;
-        ransac.getTransform(T);
-        Eigen::MatrixXd T2 = Eigen::MatrixXd::Identity(4, 4);
-        T2.block(0, 0, 2, 2) = T.block(0, 0, 2, 2);
-        T2.block(0, 3, 2, 1) = T.block(0, 2, 2, 1);
+        // ransac.getTransform(T);
 
         // Compute the transformation using motion-distorted RANSAC
         MotionDistortedRansac mdransac(p2, p1, t2prime, t1prime, md_threshold, inlier_ratio, max_iterations);
         mdransac.setMaxGNIterations(max_gn_iterations);
-        mdransac.correctForDoppler(false);
-        srand(i);
-        log << mdransac.computeModel();
+        // mdransac.correctForDoppler(false);
+        // srand(i);
+        // mdransac.computeModel();
         Eigen::MatrixXd Tmd;
-        mdransac.getTransform(delta_t, Tmd);
-        Tmd = Tmd.inverse();
+        // mdransac.getTransform(delta_t, Tmd);
+        // Tmd = Tmd.inverse();
 
         // MDRANSAC + Doppler
         mdransac.correctForDoppler(true);
         mdransac.setDopplerParameter(beta);
         srand(i);
-        log << "***DOPPLER***" << std::endl;
-        log << mdransac.computeModel();
+        // log << "***DOPPLER***" << std::endl;
+        mdransac.computeModel();
         Eigen::MatrixXd Tmd2 = Eigen::MatrixXd::Zero(4, 4);
         mdransac.getTransform(delta_t, Tmd2);
         Tmd2 = Tmd2.inverse();
@@ -192,6 +189,8 @@ int main(int argc, char *argv[]) {
             std::cout << "ground truth odometry for " << time1 << " " << time2 << " not found... exiting." << std::endl;
             return 0;
         }
+        T = Tmd2;
+        Tmd = Tmd2;
         float yaw = -1 * asin(T(0, 1));
         float yaw2 = -1 * asin(Tmd(0, 1));
         float yaw3 = -1 * asin(Tmd2(0, 1));
