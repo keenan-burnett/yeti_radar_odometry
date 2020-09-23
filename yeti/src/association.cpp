@@ -302,8 +302,10 @@ Eigen::VectorXd MotionDistortedRansac::from_cylindrical(Eigen::VectorXd ybar) {
 }
 
 void MotionDistortedRansac::dopplerCorrection(Eigen::VectorXd wbar, Eigen::VectorXd &p) {
-    double v = fabs(wbar(0, 0));
     double rsq = p(0) * p(0) + p(1) * p(1);
+    if (rsq < r_observable_sq)
+        return;
+    double v = fabs(wbar(0, 0));
     p(0) -= beta * v * p(0) * p(0) / rsq;
     p(1) -= beta * v * p(0) * p(1) / rsq;
 }

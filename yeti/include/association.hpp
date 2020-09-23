@@ -175,7 +175,8 @@ private:
     double epsilon_converge = 0.0001;
     double error_converge = 0.01;
     int dim = 2;
-    double beta = -0.0478125;  // beta = (f_t / (df / dt))
+    double beta = -0.049;  // beta = (f_t / (df / dt))
+    double r_observable_sq = 0.0625;
     bool doppler = false;
     Eigen::VectorXd w_best = Eigen::VectorXd::Zero(6);
     Eigen::Matrix4d R_pol = Eigen::Matrix4d::Identity();

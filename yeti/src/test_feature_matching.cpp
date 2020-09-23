@@ -157,21 +157,21 @@ int main(int argc, char *argv[]) {
         double delta_t = (time2 - time1) / 1000000.0;
 
         // Compute the transformation using RANSAC
-        // Ransac ransac(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
-        // srand(i);
-        // ransac.computeModel();
+        Ransac ransac(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
+        srand(i);
+        ransac.computeModel();
         Eigen::MatrixXd T;
-        // ransac.getTransform(T);
+        ransac.getTransform(T);
 
         // Compute the transformation using motion-distorted RANSAC
         MotionDistortedRansac mdransac(p2, p1, t2prime, t1prime, md_threshold, inlier_ratio, max_iterations);
         mdransac.setMaxGNIterations(max_gn_iterations);
-        // mdransac.correctForDoppler(false);
-        // srand(i);
-        // mdransac.computeModel();
+        mdransac.correctForDoppler(false);
+        srand(i);
+        mdransac.computeModel();
         Eigen::MatrixXd Tmd;
-        // mdransac.getTransform(delta_t, Tmd);
-        // Tmd = Tmd.inverse();
+        mdransac.getTransform(delta_t, Tmd);
+        Tmd = Tmd.inverse();
 
         // MDRANSAC + Doppler
         mdransac.correctForDoppler(true);
@@ -189,8 +189,6 @@ int main(int argc, char *argv[]) {
             std::cout << "ground truth odometry for " << time1 << " " << time2 << " not found... exiting." << std::endl;
             return 0;
         }
-        T = Tmd2;
-        Tmd = Tmd2;
         float yaw = -1 * asin(T(0, 1));
         float yaw2 = -1 * asin(Tmd(0, 1));
         float yaw3 = -1 * asin(Tmd2(0, 1));

@@ -28,4 +28,4 @@ max_gn_iterations: 10
 md_threshold: 0.1225
 
 # DOPPLER
-beta: -0.025
+beta: -0.049
