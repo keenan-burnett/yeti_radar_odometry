@@ -100,3 +100,6 @@ bool get_groundtruth_odometry(std::string gtfile, int64 t1, int64 t2, std::vecto
 
 void draw_matches(cv::Mat &img, std::vector<cv::KeyPoint> kp1, std::vector<cv::KeyPoint> kp2,
     std::vector<cv::DMatch> matches, int radius = 4);
+
+void getTimes(Eigen::MatrixXd cart_targets, std::vector<double> azimuths, std::vector<int64_t> times,
+    std::vector<int64_t> &tout);

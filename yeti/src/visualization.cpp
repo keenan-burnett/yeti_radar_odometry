@@ -24,8 +24,6 @@ int main() {
 
     load_radar(datadir + "/" + radar_files[6198], timestamps, azimuths, valid, fft_data);
 
-
-
     Eigen::MatrixXd targets;
     int min_range = 58;
 
@@ -34,6 +32,9 @@ int main() {
     // int guard_cells = 32;
     // cfar1d(fft_data, window_size, scale, guard_cells, min_range, targets);
 
+    // int max_points = 10000;
+    // cen2019features(fft_data, max_points, min_range, targets);
+
     float zq = 2.5;
     int sigma_gauss = 17;
     cen2018features(fft_data, zq, sigma_gauss, min_range, targets);
@@ -41,11 +42,6 @@ int main() {
     cv::Mat cart_img;
     radar_polar_to_cartesian(azimuths, fft_data, radar_resolution, cart_resolution, cart_pixel_width,
         interpolate_crossover, cart_img);
-
-    // int max_points = 10000;
-    // cen2019features(fft_data, max_points, min_range, targets);
-
-    std::cout << "targets: " << targets.cols() << std::endl;
 
     Eigen::MatrixXd cart_targets;
     polar_to_cartesian_points(azimuths, targets, radar_resolution, cart_targets);

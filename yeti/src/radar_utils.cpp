@@ -293,3 +293,30 @@ void draw_matches(cv::Mat &img, std::vector<cv::KeyPoint> kp1, std::vector<cv::K
         cv::circle(img, p1.pt, radius, cv::Scalar(0, 255, 0), -1);
     }
 }
+
+static double wrapto2pi(double theta) {
+    if (theta < 0) {
+        return theta + 2 * M_PI;
+    } else if (theta > 2 * M_PI) {
+        return theta - 2 * M_PI;
+    } else {
+        return theta;
+    }
+}
+
+void getTimes(Eigen::MatrixXd cart_targets, std::vector<double> azimuths, std::vector<int64_t> times,
+    std::vector<int64_t> &tout) {
+    tout.clear();
+    for (uint j = 0; j < cart_targets.cols(); ++j) {
+        double theta = wrapto2pi(atan2(cart_targets(1, j), cart_targets(0, j)));
+        double closest = 0;
+        double mindiff = 1000;
+        for (uint k = 0; k < mindiff; ++k) {
+            if (fabs(theta - azimuths[k]) < mindiff) {
+                mindiff = fabs(theta - azimuths[k]);
+                closest = k;
+            }
+            tout.push_back(times[closest]);
+        }
+    }
+}

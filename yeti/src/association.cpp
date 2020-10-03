@@ -231,10 +231,6 @@ double Ransac::computeModel() {
         p2small.block(0, j, dim, 1) = p2.block(0, best_inliers[j], dim, 1);
     }
     get_rigid_transform(p1small, p2small, T_best);
-    // std::stringstream ss;
-    // ss << "RANSAC iterations: " << i << std::endl;
-    // ss << "RANSAC inlier ratio: " << double(max_inliers) / double(p1.cols()) << std::endl;
-    // return ss.str();
     return double(max_inliers) / double(p1.cols());
 }
 
@@ -305,8 +301,8 @@ Eigen::VectorXd MotionDistortedRansac::from_cylindrical(Eigen::VectorXd ybar) {
 void MotionDistortedRansac::dopplerCorrection(Eigen::VectorXd wbar, Eigen::VectorXd &p) {
     double v = fabs(wbar(0, 0));
     double rsq = p(0) * p(0) + p(1) * p(1);
-    p(0) -= beta * v * p(0) * p(0) / rsq;
-    p(1) -= beta * v * p(0) * p(1) / rsq;
+    p(0) += beta * v * p(0) * p(0) / rsq;
+    p(1) += beta * v * p(0) * p(1) / rsq;
 }
 
 void MotionDistortedRansac::get_motion_parameters(std::vector<int> subset, Eigen::VectorXd &wbar) {
