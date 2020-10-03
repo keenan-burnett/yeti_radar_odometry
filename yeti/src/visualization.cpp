@@ -7,7 +7,7 @@
 #include "features.hpp"
 
 int main() {
-    std::string datadir = "/home/keenan/Documents/data/2019-01-10-14-36-48-radar-oxford-10k-partial/radar";
+    std::string datadir = "/home/keenan/Documents/data/2019-01-16-14-15-33-radar-oxford-10k/radar";
     float cart_resolution = 0.25;
     int cart_pixel_width = 1000;
     bool interpolate_crossover = true;
@@ -22,11 +22,9 @@ int main() {
     std::vector<bool> valid;
     cv::Mat fft_data;
 
-    load_radar(datadir + "/" + radar_files[300], timestamps, azimuths, valid, fft_data);
+    load_radar(datadir + "/" + radar_files[6198], timestamps, azimuths, valid, fft_data);
 
-    cv::Mat cart_img;
-    radar_polar_to_cartesian(azimuths, fft_data, radar_resolution, cart_resolution, cart_pixel_width,
-        interpolate_crossover, cart_img);
+
 
     Eigen::MatrixXd targets;
     int min_range = 58;
@@ -36,12 +34,16 @@ int main() {
     // int guard_cells = 32;
     // cfar1d(fft_data, window_size, scale, guard_cells, min_range, targets);
 
-    // float zq = 2.5;
-    // int sigma_gauss = 17;
-    // cen2018features(fft_data, zq, sigma_gauss, min_range, targets);
+    float zq = 2.5;
+    int sigma_gauss = 17;
+    cen2018features(fft_data, zq, sigma_gauss, min_range, targets);
 
-    int max_points = 10000;
-    cen2019features(fft_data, max_points, min_range, targets);
+    cv::Mat cart_img;
+    radar_polar_to_cartesian(azimuths, fft_data, radar_resolution, cart_resolution, cart_pixel_width,
+        interpolate_crossover, cart_img);
+
+    // int max_points = 10000;
+    // cen2019features(fft_data, max_points, min_range, targets);
 
     std::cout << "targets: " << targets.cols() << std::endl;
 

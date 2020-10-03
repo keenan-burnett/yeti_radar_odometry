@@ -1,6 +1,8 @@
 import csv
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+import sys
 
 def enforce_orthogonality(R):
     epsilon = 0.001
@@ -113,13 +115,19 @@ if __name__ == '__main__':
     dt_dopp = []
     dr_dopp = []
 
-    gpsfile = '/home/keenan/radar_ws/data/2019-01-16-14-15-33-radar-oxford-10k/gps/ins.csv'
+    # gpsfile = '/home/keenan/radar_ws/data/2019-01-10-14-36-48-radar-oxford-10k-partial/gps/ins.csv'
 
     outlier_count = 0
 
     threshold = 2.0
 
-    with open('accuracy.csv', 'r') as f:
+    afile = 'accuracy.csv'
+    if len(sys.argv) > 1:
+        afile = sys.argv[1]
+
+    print(afile)
+
+    with open(afile, 'r') as f:
         f.readline()
         for line in f:
             row = line.split(',')
@@ -270,7 +278,7 @@ if __name__ == '__main__':
     axs[0].plot(omegabins, t_bins, 'or-', label='MDRANSAC', linewidth=2)
     axs[1].plot(omegabins, r_bins, 'or-', label='MDRANSAC', linewidth=2)
 
-    plt.show()
+    # plt.show()
 
 
 
@@ -278,7 +286,7 @@ if __name__ == '__main__':
     T_gt = np.identity(3)
     T_rigid = np.identity(3)
     T_md = np.identity(3)
-    T_gps = np.identity(3)
+    # T_gps = np.identity(3)
     T_dopp = np.identity(3)
 
     xgt = []
@@ -292,7 +300,7 @@ if __name__ == '__main__':
     xdopp = []
     ydopp = []
 
-    with open('accuracy.csv') as f:
+    with open(afile) as f:
         reader = csv.reader(f, delimiter=',')
         i = 0
         for row in reader:
@@ -327,14 +335,14 @@ if __name__ == '__main__':
                 T_dopp[0:2,0:2] = R_dopp
 
             # Get GPS ground truth between the frames
-            time1 = int(row[6])
-            time2 = int(row[7])
-            T_gps_ = get_ins_transformation(time1, time2, gpsfile)
-            T_gps = np.matmul(T_gps, T_gps_)
-            R_gps = T_gps[0:2,0:2]
-            if np.linalg.det(R_gps) != 1.0:
-                enforce_orthogonality(R_gps)
-                T_gps[0:2,0:2] = R_gps
+            # time1 = int(row[6])
+            # time2 = int(row[7])
+            # T_gps_ = get_ins_transformation(time1, time2, gpsfile)
+            # T_gps = np.matmul(T_gps, T_gps_)
+            # R_gps = T_gps[0:2,0:2]
+            # if np.linalg.det(R_gps) != 1.0:
+            #     enforce_orthogonality(R_gps)
+            #     T_gps[0:2,0:2] = R_gps
 
             xgt.append(T_gt[0, 2])
             ygt.append(T_gt[1, 2])
@@ -342,8 +350,8 @@ if __name__ == '__main__':
             yrigid.append(T_rigid[1, 2])
             xmd.append(T_md[0, 2])
             ymd.append(T_md[1, 2])
-            xgps.append(T_gps[0, 2])
-            ygps.append(T_gps[1, 2])
+            # xgps.append(T_gps[0, 2])
+            # ygps.append(T_gps[1, 2])
             xdopp.append(T_dopp[0, 2])
             ydopp.append(T_dopp[1, 2])
 
@@ -353,18 +361,20 @@ if __name__ == '__main__':
     yrigid = np.array(yrigid)
     xmd = np.array(xmd)
     ymd = np.array(ymd)
-    xgps = np.array(xgps)
-    ygps = np.array(ygps)
+    # xgps = np.array(xgps)
+    # ygps = np.array(ygps)
     xdopp = np.array(xdopp)
     ydopp = np.array(ydopp)
+
+    matplotlib.rcParams.update({'font.size': 13})
 
     fig, ax = plt.subplots(tight_layout=True)
     ax.set_aspect('equal')
     ax.plot(xgt, ygt, 'k', linewidth=2, label='Ground Truth')
     ax.plot(xrigid, yrigid, 'r', linewidth=2, label='RIGID')
     ax.plot(xmd, ymd, 'b', linewidth=2, label='MDRANSAC')
-    ax.plot(xgps, ygps, 'g', linewidth=2, label='GPS')
-    ax.set_title('Ground Truth vs. Radar Odometry (Demo Sequence)')
-    ax.legend(loc="upper left", fontsize='xx-small')
-    plt.savefig('trajectory.png')
+    # ax.plot(xgps, ygps, 'g', linewidth=2, label='GPS')
+    ax.set_title('Ground Truth vs. Radar Odometry')
+    ax.legend(loc="upper right")
+    plt.savefig('trajectory.pdf')
     # plt.show()

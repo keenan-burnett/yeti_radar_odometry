@@ -10,7 +10,6 @@
 #include "radar_utils.hpp"
 #include "features.hpp"
 #include "association.hpp"
-#include <omp.h>
 
 void getTimes(Eigen::MatrixXd cart_targets, std::vector<double> azimuths, std::vector<int64_t> times,
     std::vector<int64_t> &tout) {
@@ -27,6 +26,15 @@ void getTimes(Eigen::MatrixXd cart_targets, std::vector<double> azimuths, std::v
             tout.push_back(times[closest]);
         }
     }
+}
+
+template <typename T>
+bool contains(std::vector<T> v, T x) {
+    for (uint i = 0; i < v.size(); ++i) {
+        if (v[i] == x)
+            return true;
+    }
+    return false;
 }
 
 int main(int argc, char *argv[]) {
@@ -92,24 +100,31 @@ int main(int argc, char *argv[]) {
     std::vector<bool> valid;
     cv::Mat fft_data;
 
-    for (uint i = 0; i < radar_files.size() - 1; ++i) {
-        std::cout << i << "/" << radar_files.size() << "\r";
-        std::cout.flush();
-        if (i > 0) {
+    uint start = 0;
+
+    for (uint i = start; i < radar_files.size() - 1; ++i) {
+        std::cout << i << "/" << radar_files.size() << "\n";
+        // std::cout.flush();
+        if (i > start) {
             t1 = t2; desc1 = desc2.clone(); cart_targets1 = cart_targets2;
             kp1 = kp2; img2.copyTo(img1);
         }
         load_radar(datadir + "/" + radar_files[i], times, azimuths, valid, fft_data);
-        double runtime = 0;
         if (keypoint_extraction == 0)
-            runtime = cen2018features(fft_data, zq, sigma_gauss, min_range, targets);
+            cen2018features(fft_data, zq, sigma_gauss, min_range, targets);
         if (keypoint_extraction == 1)
-            runtime = cen2019features(fft_data, max_points, min_range, targets);
-        // log << "feature extraction: " << runtime << std::endl;
+            cen2019features(fft_data, max_points, min_range, targets);
         if (keypoint_extraction == 0 || keypoint_extraction == 1) {
-            polar_to_cartesian_points(azimuths, times, targets, radar_resolution, cart_targets2, t2);
-            convert_to_bev(cart_targets2, cart_resolution, cart_pixel_width, patch_size, kp2, t2);
             radar_polar_to_cartesian(azimuths, fft_data, radar_resolution, cart_resolution, cart_pixel_width, interp, img2, CV_8UC1);  // NOLINT
+            polar_to_cartesian_points(azimuths, times, targets, radar_resolution, cart_targets2, t2);
+
+            cv::Mat feats;
+            img2.copyTo(feats);
+            cv::cvtColor(feats, feats, cv::COLOR_GRAY2BGR);
+            draw_points(img2, cart_targets2, cart_resolution, cart_pixel_width, feats);
+            cv::imshow("feats", feats);
+
+            convert_to_bev(cart_targets2, cart_resolution, cart_pixel_width, patch_size, kp2, t2);
             detector->compute(img2, kp2, desc2);
         }
         if (keypoint_extraction == 2) {
@@ -118,12 +133,16 @@ int main(int argc, char *argv[]) {
             convert_from_bev(kp2, cart_resolution, cart_pixel_width, cart_targets2);
             getTimes(cart_targets2, azimuths, times, t2);
         }
-        // getTimes(cart_targets2, azimuths, times, t2);
-        if (i == 0)
+        if (i == start)
             continue;
+
+        std::cout << "t1: " << cart_targets1.cols() << "t2: " << cart_targets2.cols() << std::endl;
+
         // Match keypoint descriptors
         std::vector<std::vector<cv::DMatch>> knn_matches;
         matcher->knnMatch(desc1, desc2, knn_matches, 2);
+
+        std::cout << "knn matches: " << knn_matches.size() << std::endl;
         // Filter matches using nearest neighbor distance ratio (Lowe, Szeliski)
         std::vector<cv::DMatch> good_matches;
         for (uint j = 0; j < knn_matches.size(); ++j) {
@@ -134,10 +153,19 @@ int main(int argc, char *argv[]) {
             }
         }
 
+        cv::Mat good;
+        img2.copyTo(good);
+        cv::cvtColor(good, good, cv::COLOR_GRAY2BGR);
+        draw_matches(good, kp1, kp2, good_matches);
+        cv::imshow("good", good);
+
         // Convert the good key point matches to Eigen matrices
         Eigen::MatrixXd p1 = Eigen::MatrixXd::Zero(2, good_matches.size());
         Eigen::MatrixXd p2 = p1;
         std::vector<int64_t> t1prime = t1, t2prime = t2;
+
+        std::cout << "good matches: " << good_matches.size() << std::endl;
+
         for (uint j = 0; j < good_matches.size(); ++j) {
             p1(0, j) = cart_targets1(0, good_matches[j].queryIdx);
             p1(1, j) = cart_targets1(1, good_matches[j].queryIdx);
@@ -163,6 +191,21 @@ int main(int argc, char *argv[]) {
         Eigen::MatrixXd T;
         ransac.getTransform(T);
 
+        std::vector<int> inliers;
+        ransac.getInliers(T, inliers);
+
+        std::cout << "rigid inliers: " << inliers.size() << std::endl;
+
+        std::vector<cv::DMatch> inlier_matches;
+        for (uint j = 0; j < inliers.size(); ++j) {
+            inlier_matches.push_back(good_matches[inliers[j]]);
+        }
+        cv::Mat img_matches;
+        img2.copyTo(img_matches);
+        cv::cvtColor(img_matches, img_matches, cv::COLOR_GRAY2BGR);
+        draw_matches(img_matches, kp1, kp2, inlier_matches);
+        cv::imshow("matches_rigid", img_matches);
+
         // Compute the transformation using motion-distorted RANSAC
         MotionDistortedRansac mdransac(p2, p1, t2prime, t1prime, md_threshold, inlier_ratio, max_iterations);
         mdransac.setMaxGNIterations(max_gn_iterations);
@@ -173,12 +216,31 @@ int main(int argc, char *argv[]) {
         mdransac.getTransform(delta_t, Tmd);
         Tmd = Tmd.inverse();
 
+        Eigen::VectorXd wbar;
+        mdransac.getMotion(wbar);
+        inliers.clear();
+        mdransac.getInliers(wbar, inliers);
+
+        std::cout << "mdransac inliers: " << inliers.size() << std::endl;
+
+        inlier_matches.clear();
+        for (uint j = 0; j < inliers.size(); ++j) {
+            inlier_matches.push_back(good_matches[inliers[j]]);
+        }
+        cv::Mat img_matches2;
+        img2.copyTo(img_matches2);
+        cv::cvtColor(img_matches2, img_matches2, cv::COLOR_GRAY2BGR);
+        draw_matches(img_matches2, kp1, kp2, inlier_matches);
+        cv::imshow("matches_mdransac", img_matches2);
+        cv::waitKey(0);
+
+
         // MDRANSAC + Doppler
-        mdransac.correctForDoppler(true);
-        mdransac.setDopplerParameter(beta);
-        srand(i);
+        // mdransac.correctForDoppler(true);
+        // mdransac.setDopplerParameter(beta);
+        // srand(i);
         // log << "***DOPPLER***" << std::endl;
-        mdransac.computeModel();
+        // mdransac.computeModel();
         Eigen::MatrixXd Tmd2 = Eigen::MatrixXd::Zero(4, 4);
         mdransac.getTransform(delta_t, Tmd2);
         Tmd2 = Tmd2.inverse();
@@ -192,6 +254,7 @@ int main(int argc, char *argv[]) {
         float yaw = -1 * asin(T(0, 1));
         float yaw2 = -1 * asin(Tmd(0, 1));
         float yaw3 = -1 * asin(Tmd2(0, 1));
+
         // Write estimated and ground truth transform to the csv file
         ofs << T(0, 2) << "," << T(1, 2) << "," << yaw << ",";
         ofs << gtvec[0] << "," << gtvec[1] << "," << gtvec[5] << ",";
@@ -204,5 +267,6 @@ int main(int argc, char *argv[]) {
         // cv::imshow("good", img_matches);
         // cv::waitKey(0);
     }
+
     return 0;
 }

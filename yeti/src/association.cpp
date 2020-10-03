@@ -192,7 +192,7 @@ double wrapto2pi(double theta) {
     }
 }
 
-std::string Ransac::computeModel() {
+double Ransac::computeModel() {
     uint max_inliers = 0;
     std::vector<int> best_inliers;
     int dim = p1.rows();
@@ -231,10 +231,11 @@ std::string Ransac::computeModel() {
         p2small.block(0, j, dim, 1) = p2.block(0, best_inliers[j], dim, 1);
     }
     get_rigid_transform(p1small, p2small, T_best);
-    std::stringstream ss;
-    ss << "RANSAC iterations: " << i << std::endl;
-    ss << "RANSAC inlier ratio: " << double(max_inliers) / double(p1.cols()) << std::endl;
-    return ss.str();
+    // std::stringstream ss;
+    // ss << "RANSAC iterations: " << i << std::endl;
+    // ss << "RANSAC inlier ratio: " << double(max_inliers) / double(p1.cols()) << std::endl;
+    // return ss.str();
+    return double(max_inliers) / double(p1.cols());
 }
 
 void Ransac::getInliers(Eigen::MatrixXd Tf, std::vector<int> &inliers) {
@@ -380,7 +381,25 @@ void MotionDistortedRansac::get_motion_parameters2(Eigen::MatrixXd& p1small, Eig
     wbar = A.bdcSvd(Eigen::ComputeThinU | Eigen::ComputeThinV).solve(b);
 }
 
+static int get_closest(double x, std::vector<double> v) {
+    int closest = 0;
+    double distance = 1000;
+    for (uint i = 0; i < v.size(); ++i) {
+        double d = fabs(x - v[i]);
+        if (d < distance) {
+            closest = i;
+            distance = d;
+        }
+    }
+    return closest;
+}
+
 void MotionDistortedRansac::getInliers(Eigen::VectorXd wbar, std::vector<int> &inliers) {
+    // Use a discrete number of transforms to speed this up
+    std::vector<Eigen::MatrixXd> transforms(num_transforms);
+    for (int i = 0; i < num_transforms; ++i) {
+        transforms[i] = se3ToSE3(delta_vec[i] * wbar);
+    }
     for (uint i = 0; i < p1bar.cols(); ++i) {
         Eigen::VectorXd p2 = p2bar.block(0, i, 4, 1);
         Eigen::VectorXd p1 = p1bar.block(0, i, 4, 1);
@@ -388,14 +407,20 @@ void MotionDistortedRansac::getInliers(Eigen::VectorXd wbar, std::vector<int> &i
             dopplerCorrection(wbar, p1);
             dopplerCorrection(wbar, p2);
         }
-        Eigen::MatrixXd Tm = se3ToSE3(delta_ts[i] * wbar);
-        Eigen::VectorXd error = p2 - Tm * p1;
+        // Eigen::MatrixXd Tm = se3ToSE3(delta_ts[i] * wbar);
+        // Eigen::VectorXd error = p2 - Tm * p1;
+        Eigen::VectorXd error = p2 - transforms[get_closest(delta_ts[i], delta_vec)] * p1;
         if (error.squaredNorm() < tolerance)
             inliers.push_back(i);
     }
 }
 
 int MotionDistortedRansac::getNumInliers(Eigen::VectorXd wbar) {
+    // Use a discrete number of transforms to speed this up
+    std::vector<Eigen::MatrixXd> transforms(num_transforms);
+    for (int i = 0; i < num_transforms; ++i) {
+        transforms[i] = se3ToSE3(delta_vec[i] * wbar);
+    }
     int inliers = 0;
     for (uint i = 0; i < p1bar.cols(); ++i) {
         Eigen::VectorXd p2 = p2bar.block(0, i, 4, 1);
@@ -404,8 +429,9 @@ int MotionDistortedRansac::getNumInliers(Eigen::VectorXd wbar) {
             dopplerCorrection(wbar, p1);
             dopplerCorrection(wbar, p2);
         }
-        Eigen::MatrixXd Tm = se3ToSE3(delta_ts[i] * wbar);
-        Eigen::VectorXd error = p2 - Tm * p1;
+        // Eigen::MatrixXd Tm = se3ToSE3(delta_ts[i] * wbar);
+        // Eigen::VectorXd error = p2 - Tm * p1;
+        Eigen::VectorXd error = p2 - transforms[get_closest(delta_ts[i], delta_vec)] * p1;
         if (error.squaredNorm() < tolerance)
             inliers++;
     }
@@ -416,24 +442,22 @@ void MotionDistortedRansac::getTransform(double delta_t, Eigen::MatrixXd &Tf) {
     Tf = se3ToSE3(w_best * delta_t);
 }
 
-std::string MotionDistortedRansac::computeModel() {
+double MotionDistortedRansac::computeModel() {
     auto start = std::chrono::high_resolution_clock::now();
     int max_inliers = 0;
     int subset_size = 2;
     int i = 0;
     for (i = 0; i < iterations; ++i) {
         std::vector<int> subset = random_subset(p1bar.cols(), subset_size);
-        // NLLS to obtain the motion estimate
         Eigen::VectorXd wbar = Eigen::VectorXd::Zero(6, 1);
         get_motion_parameters(subset, wbar);
-        // Check the number of inliers
         int inliers = getNumInliers(wbar);
         if (inliers > max_inliers) {
             max_inliers = inliers;
             w_best = wbar;
         }
-        // if (double(inliers) / double(p1bar.cols()) > inlier_ratio)
-            // break;
+        if (double(inliers) / double(p1bar.cols()) > inlier_ratio)
+            break;
     }
     // Refine transformation using the inlier set
     std::vector<int> best_inliers;
@@ -441,9 +465,8 @@ std::string MotionDistortedRansac::computeModel() {
     get_motion_parameters(best_inliers, w_best);
     auto stop = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> e = stop - start;
-    std::stringstream ss;
-    ss << "MDRANSAC iterations: " << i << std::endl;
-    ss << "MDRANSAC inlier ratio: " << double(best_inliers.size()) / double(p1bar.cols()) << std::endl;
-    ss << "MDRANSAC runtime: " << e.count() << std::endl;
-    return ss.str();
+    // std::cout << "MDRANSAC runtime: " << e.count() << std::endl;
+    // std::cout << "MDRANSAC iterations: " << i << std::endl;
+    // std::cout << "MDRANSAC inlier ratio: " << double(best_inliers.size()) / double(p1bar.cols()) << std::endl;
+    return double(best_inliers.size()) / double(p1bar.cols());
 }

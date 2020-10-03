@@ -99,7 +99,12 @@ public:
     /*!
        \brief Computes the transform that best aligns the two pointclouds such at T * p1 = p2
     */
-    std::string computeModel();
+    double computeModel();
+
+    /*!
+       \brief Retrieves the set of point pairs which are inliers given the current transform Tf.
+    */
+    void getInliers(Eigen::MatrixXd Tf, std::vector<int> &inliers);
 
 private:
     Eigen::MatrixXd p1, p2;
@@ -107,11 +112,6 @@ private:
     double inlier_ratio = 0.9;
     int iterations = 40;
     Eigen::MatrixXd T_best;
-
-    /*!
-       \brief Retrieves the set of point pairs which are inliers given the current transform Tf.
-    */
-    void getInliers(Eigen::MatrixXd Tf, std::vector<int> &inliers);
 };
 
 //* MotionDistortedRansac
@@ -148,6 +148,16 @@ public:
         for (uint i = 0; i < p1bar.cols(); ++i) {
             int64_t delta_t = t2[i] - t1[i];
             delta_ts[i] = double(delta_t) / 1000000.0;
+            if (delta_ts[i] > max_delta_t) {
+                max_delta_t = delta_ts[i];
+            }
+            if (delta_ts[i] < min_delta_t) {
+                min_delta_t = delta_ts[i];
+            }
+        }
+        double delta_diff = (max_delta_t - min_delta_t) / (num_transforms - 1);
+        for (uint i = 0; i < num_transforms; ++i) {
+            delta_vec.push_back(min_delta_t + i * delta_diff);
         }
     }
     void setTolerance(double tolerance_) {tolerance = tolerance_;}
@@ -163,7 +173,12 @@ public:
     /*!
        \brief Computes the ego-motion vector that best aligns the two pointclouds
     */
-    std::string computeModel();
+    double computeModel();
+
+    /*!
+       \brief Retrieves the set of point pairs which are inliers given the current motion estimate.
+    */
+    void getInliers(Eigen::VectorXd wbar, std::vector<int> &inliers);
 
 private:
     Eigen::MatrixXd p1bar, p2bar;
@@ -178,6 +193,10 @@ private:
     double beta = -0.049;  // beta = (f_t / (df / dt))
     double r_observable_sq = 0.0625;
     bool doppler = false;
+    int num_transforms = 21;
+    double max_delta_t = 0.0;
+    double min_delta_t = 0.5;
+    std::vector<double> delta_vec;
     Eigen::VectorXd w_best = Eigen::VectorXd::Zero(6);
     Eigen::Matrix4d R_pol = Eigen::Matrix4d::Identity();
     Eigen::MatrixXd get_jacobian(Eigen::Vector4d gbar);
@@ -199,11 +218,6 @@ private:
     */
     void get_motion_parameters2(Eigen::MatrixXd& p1small, Eigen::MatrixXd& p2small, std::vector<double> delta_t_local,
         Eigen::VectorXd &wbar);
-
-    /*!
-       \brief Retrieves the set of point pairs which are inliers given the current motion estimate.
-    */
-    void getInliers(Eigen::VectorXd wbar, std::vector<int> &inliers);
 
     int getNumInliers(Eigen::VectorXd wbar);
 

@@ -209,7 +209,7 @@ void convert_to_bev(Eigen::MatrixXd &cart_points, float cart_resolution, int car
             j++;
         }
     }
-    cart_points.conservativeResize(2, bev_points.size());
+    cart_points.conservativeResize(3, bev_points.size());
 }
 
 void convert_to_bev(Eigen::MatrixXd &cart_points, float cart_resolution, int cart_pixel_width, int patch_size,
@@ -232,7 +232,7 @@ void convert_to_bev(Eigen::MatrixXd &cart_points, float cart_resolution, int car
         }
     }
     point_times.resize(bev_points.size());
-    cart_points.conservativeResize(2, bev_points.size());
+    cart_points.conservativeResize(3, bev_points.size());
 }
 
 void convert_from_bev(std::vector<cv::KeyPoint> bev_points, float cart_resolution, int cart_pixel_width,
@@ -253,8 +253,11 @@ void draw_points(cv::Mat cart_img, Eigen::MatrixXd cart_targets, float cart_reso
     convert_to_bev(cart_targets, cart_resolution, cart_pixel_width, bev_points);
     cv::cvtColor(cart_img, vis, cv::COLOR_GRAY2BGR);
     for (cv::Point2f p : bev_points) {
-        // cv::circle(vis, p, 1, cv::Scalar(0, 0, 255), -1);
-        vis.at<cv::Vec3f>(int(p.y), int(p.x)) = cv::Vec3f(0, 0, 255);
+        cv::circle(vis, p, 2, cv::Scalar(0, 0, 255), -1);
+        // if (cart_img.depth() == CV_8UC1)
+            // vis.at<cv::Vec3b>(int(p.y), int(p.x)) = cv::Vec3f(0, 0, 255);
+        // if (cart_img.depth() == CV_32F)
+            // vis.at<cv::Vec3f>(int(p.y), int(p.x)) = cv::Vec3f(0, 0, 255);
     }
 }
 
@@ -276,4 +279,17 @@ bool get_groundtruth_odometry(std::string gtfile, int64 t1, int64 t2, std::vecto
         }
     }
     return gtfound;
+}
+
+// use img2
+void draw_matches(cv::Mat &img, std::vector<cv::KeyPoint> kp1, std::vector<cv::KeyPoint> kp2,
+    std::vector<cv::DMatch> matches, int radius) {
+
+    for (uint i = 0; i < matches.size(); ++i) {
+        cv::KeyPoint p1 = kp1[matches[i].queryIdx];
+        cv::KeyPoint p2 = kp2[matches[i].trainIdx];
+        cv::line(img, p2.pt, p1.pt, cv::Scalar(255, 255, 255), 2);
+        cv::circle(img, p2.pt, radius, cv::Scalar(0, 0, 255), -1);
+        cv::circle(img, p1.pt, radius, cv::Scalar(0, 255, 0), -1);
+    }
 }

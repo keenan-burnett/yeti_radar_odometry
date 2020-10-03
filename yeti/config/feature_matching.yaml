@@ -1,8 +1,8 @@
 min_range: 58	# min range of radar points (bin)
 radar_resolution: 0.0432	# resolution of radar bins in meters per bin
 
-cart_resolution: 0.25	# meters per pixel
-cart_pixel_width: 1000	# height and width of cartesian image in pixels
+cart_resolution: 0.2592	# meters per pixel
+cart_pixel_width: 578	# height and width of cartesian image in pixels
 interp: true
 
 # cen2018 feature parameters
@@ -28,4 +28,4 @@ max_gn_iterations: 10
 md_threshold: 0.1225
 
 # DOPPLER
-beta: -0.049
+beta: 0.049
