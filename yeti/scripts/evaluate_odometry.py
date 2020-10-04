@@ -163,7 +163,8 @@ if __name__ == '__main__':
     err_md = []
     err_dopp = []
 
-    for files in files:
+    for file in files:
+	print(file)
         T_gt = np.identity(3)
         T_res = np.identity(3)
         T_md = np.identity(3)
@@ -172,7 +173,7 @@ if __name__ == '__main__':
         poses_res = []
         poses_md = []
         poses_dopp = []
-        with open(afile) as f:
+        with open(file) as f:
             reader = csv.reader(f, delimiter=',')
             i = 0
             for row in reader:
@@ -218,7 +219,6 @@ if __name__ == '__main__':
     saveSequenceErrors(err_rigid, 'pose_error_rigid.csv')
     saveSequenceErrors(err_md, 'pose_error_mdransac.csv')
     saveSequenceErrors(err_dopp, 'pose_error_dopp.csv')
-
     saveErrorPlots([err_rigid, err_md, err_dopp], 'pose_error.png')
     t_err, r_err = getStats(err)
     print('RIGID:')
