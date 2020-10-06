@@ -150,3 +150,14 @@ target_link_libraries(test_doppler_distortion
 	matplotlibcpp
 )
 target_compile_definitions(test_doppler_distortion PRIVATE "-DWITHOUT_NUMPY")
+
+add_executable(showcase_distortion src/showcase_distortion.cpp)
+target_link_libraries(showcase_distortion
+    features
+    radar_utils
+    association
+	${catkin_LIBRARIES}
+	${OpenCV_LIBRARIES}
+	matplotlibcpp
+)
+target_compile_definitions(showcase_distortion PRIVATE "-DWITHOUT_NUMPY")

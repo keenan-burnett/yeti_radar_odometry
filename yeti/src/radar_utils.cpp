@@ -42,7 +42,7 @@ void get_file_names(std::string datadir, std::vector<std::string> &radar_files, 
 }
 
 void load_radar(std::string path, std::vector<int64_t> &timestamps, std::vector<double> &azimuths,
-    std::vector<bool> &valid, cv::Mat &fft_data) {
+    std::vector<bool> &valid, cv::Mat &fft_data, int navtech_version) {
     int encoder_size = 5600;
     cv::Mat raw_example_data = cv::imread(path, cv::IMREAD_GRAYSCALE);
     int N = raw_example_data.rows;
@@ -50,18 +50,21 @@ void load_radar(std::string path, std::vector<int64_t> &timestamps, std::vector<
     azimuths = std::vector<double>(N, 0);
     valid = std::vector<bool>(N, true);
     int range_bins = 3768;
+    if (navtech_version == CIR204)
+        range_bins = 3360;
     fft_data = cv::Mat::zeros(N, range_bins, CV_32F);
     for (int i = 0; i < N; ++i) {
         uchar* byteArray = raw_example_data.ptr<uchar>(i);
         timestamps[i] = *((int64_t *)(byteArray));
         azimuths[i] = *((uint16_t *)(byteArray + 8)) * 2 * M_PI / double(encoder_size);
         valid[i] = byteArray[10] == 255;
-        for (int j = 0; j < range_bins; j++) {
+        for (int j = 42; j < range_bins; j++) {
             fft_data.at<float>(i, j) = (float)*(byteArray + 11 + j) / 255.0;
         }
     }
 }
 
+// file is in the oxford dataset format
 void load_velodyne(std::string path, std::vector<int64_t> &timestamps, std::vector<double> &azimuths,
     Eigen::MatrixXd &pc) {
     double hdl32e_range_resolution = 0.002;
@@ -108,8 +111,29 @@ void load_velodyne(std::string path, std::vector<int64_t> &timestamps, std::vect
     }
 }
 
+// file is the result of saving a D X N pointcloud into a .txt file (comma-separated)
+void load_velodyne2(std::string path, Eigen::MatrixXd &pc) {
+    std::ifstream ifs(path);
+    std::string line;
+    int N = 0;
+    while (std::getline(ifs, line))
+        ++N;
+    ifs = std::ifstream(path);
+    pc = Eigen::MatrixXd::Zero(3, N);
+    int i = 0;
+    while (std::getline(ifs, line)) {
+        std::vector<std::string> parts;
+        boost::split(parts, line, boost::is_any_of(","));
+        for (int j = 0; j < 3; ++j) {
+            pc(j, i) = std::stod(parts[j]);
+        }
+        i++;
+    }
+}
+
 void radar_polar_to_cartesian(std::vector<double> &azimuths, cv::Mat &fft_data, float radar_resolution,
-    float cart_resolution, int cart_pixel_width, bool interpolate_crossover, cv::Mat &cart_img, int output_type) {
+    float cart_resolution, int cart_pixel_width, bool interpolate_crossover, cv::Mat &cart_img, int output_type,
+    int navtech_version) {
 
     float cart_min_range = (cart_pixel_width / 2) * cart_resolution;
     if (cart_pixel_width % 2 == 0)
@@ -134,6 +158,10 @@ void radar_polar_to_cartesian(std::vector<double> &azimuths, cv::Mat &fft_data, 
     cv::Mat angle = cv::Mat::zeros(cart_pixel_width, cart_pixel_width, CV_32F);
 
     double azimuth_step = azimuths[1] - azimuths[0];
+    if (navtech_version == CIR204) {
+        azimuths[0] = 0;
+        azimuth_step = M_PI / 200;
+    }
 #pragma omp parallel for collapse(2)
     for (int i = 0; i < range.rows; ++i) {
         for (int j = 0; j < range.cols; ++j) {
@@ -253,14 +281,15 @@ void draw_points(cv::Mat cart_img, Eigen::MatrixXd cart_targets, float cart_reso
     convert_to_bev(cart_targets, cart_resolution, cart_pixel_width, bev_points);
     cv::cvtColor(cart_img, vis, cv::COLOR_GRAY2BGR);
     for (cv::Point2f p : bev_points) {
-        cv::circle(vis, p, 2, cv::Scalar(0, 0, 255), -1);
-        // if (cart_img.depth() == CV_8UC1)
-            // vis.at<cv::Vec3b>(int(p.y), int(p.x)) = cv::Vec3f(0, 0, 255);
-        // if (cart_img.depth() == CV_32F)
-            // vis.at<cv::Vec3f>(int(p.y), int(p.x)) = cv::Vec3f(0, 0, 255);
+        // cv::circle(vis, p, 2, cv::Scalar(0, 0, 255), -1);
+        if (cart_img.depth() == CV_8UC1)
+            vis.at<cv::Vec3b>(int(p.y), int(p.x)) = cv::Vec3f(0, 0, 255);
+        if (cart_img.depth() == CV_32F)
+            vis.at<cv::Vec3f>(int(p.y), int(p.x)) = cv::Vec3f(0, 0, 255);
     }
 }
 
+// Oxford format
 bool get_groundtruth_odometry(std::string gtfile, int64 t1, int64 t2, std::vector<float> &gt) {
     std::ifstream ifs(gtfile);
     std::string line;
@@ -276,6 +305,29 @@ bool get_groundtruth_odometry(std::string gtfile, int64 t1, int64 t2, std::vecto
             }
             gtfound = true;
             break;
+        }
+    }
+    return gtfound;
+}
+
+// Boreas format
+bool get_groundtruth_odometry2(std::string gtfile, int64_t t, std::vector<double> &gt) {
+    std::ifstream ifs(gtfile);
+    std::string line;
+    gt.clear();
+    bool gtfound = false;
+    double min_delta = 0.1;
+    while (std::getline(ifs, line)) {
+        std::vector<std::string> parts;
+        boost::split(parts, line, boost::is_any_of(","));
+        int64_t t2 = std::stoll(parts[0]);
+        double delta = fabs((t - t2) / 1000000000.0);
+        if (delta < min_delta) {
+            for (uint i = 0; i < parts.size(); ++i) {
+                gt.push_back(std::stod(parts[i]));
+            }
+            gtfound = true;
+            min_delta = delta;
         }
     }
     return gtfound;

@@ -369,6 +369,7 @@ if __name__ == '__main__':
     matplotlib.rcParams.update({'font.size': 13})
 
     fig, ax = plt.subplots(tight_layout=True)
+    plt.grid(which='both', linestyle='--', alpha=0.5)
     ax.set_aspect('equal')
     ax.plot(xgt, ygt, 'k', linewidth=2, label='Ground Truth')
     ax.plot(xrigid, yrigid, 'r', linewidth=2, label='RIGID')

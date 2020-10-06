@@ -5,6 +5,9 @@
 #include <opencv2/core.hpp>
 #include <boost/algorithm/string.hpp>
 
+#define CTS350 0
+#define CIR204 1
+
 /*!
    \brief Retrieves a vector of the (radar) file names in ascending order of time stamp
    \param datadir (absolute) path to the directory that contains (radar) files
@@ -22,10 +25,12 @@ void get_file_names(std::string datadir, std::vector<std::string> &radar_files, 
    \param fft_data [out] Radar power readings along each azimuth
 */
 void load_radar(std::string path, std::vector<int64_t> &timestamps, std::vector<double> &azimuths,
-    std::vector<bool> &valid, cv::Mat &fft_data);
+    std::vector<bool> &valid, cv::Mat &fft_data, int navtech_version = CTS350);
 
 void load_velodyne(std::string path, std::vector<int64_t> &timestamps, std::vector<double> &azimuths,
     Eigen::MatrixXd &pc);
+
+void load_velodyne2(std::string path, Eigen::MatrixXd &pc);
 
 /*!
    \brief Decode a single Oxford Radar RobotCar Dataset radar example
@@ -39,7 +44,7 @@ void load_velodyne(std::string path, std::vector<int64_t> &timestamps, std::vect
 */
 void radar_polar_to_cartesian(std::vector<double> &azimuths, cv::Mat &fft_data, float radar_resolution,
     float cart_resolution, int cart_pixel_width, bool interpolate_crossover, cv::Mat &cart_img,
-    int output_type = CV_32F);
+    int output_type = CV_32F, int navtech_version = CTS350);
 
 /*!
    \brief Converts points from polar coordinates to cartesian coordinates
@@ -97,6 +102,8 @@ void draw_points(cv::Mat cart_img, Eigen::MatrixXd cart_targets, float cart_reso
    \param gt [out] Vector of floats for the ground truth transform between radar timestamp t1 and t2 (x, y, z, r, p, y)
 */
 bool get_groundtruth_odometry(std::string gtfile, int64 t1, int64 t2, std::vector<float> &gt);
+
+bool get_groundtruth_odometry2(std::string gtfile, int64_t t, std::vector<double> &gt);
 
 void draw_matches(cv::Mat &img, std::vector<cv::KeyPoint> kp1, std::vector<cv::KeyPoint> kp2,
     std::vector<cv::DMatch> matches, int radius = 4);

@@ -156,7 +156,7 @@ public:
             }
         }
         double delta_diff = (max_delta_t - min_delta_t) / (num_transforms - 1);
-        for (uint i = 0; i < num_transforms; ++i) {
+        for (int i = 0; i < num_transforms; ++i) {
             delta_vec.push_back(min_delta_t + i * delta_diff);
         }
     }

@@ -42,6 +42,75 @@ Eigen::Matrix4d get_transform_from_file(std::string path) {
     return T;
 }
 
+void undistort_radar_image(cv::Mat &input, cv::Mat &output, Eigen::VectorXd wbar, float cart_resolution,
+    int cart_pixel_width) {
+
+    std::vector<double> azimuths(400);
+    azimuths[0] = 0;
+    double azimuth_step = M_PI / 200;
+    for (uint i = 1; i < azimuths.size(); ++i) {
+        azimuths[i] = azimuths[i - 1] + azimuth_step;
+    }
+    std::vector<double> times(400);
+    times[0] = 0;
+    double time_step = 0.000625;
+    for (uint i = 1; i < times.size(); ++i) {
+        times[i] = times[i - 1] + time_step;
+    }
+    float cart_min_range = (cart_pixel_width / 2) * cart_resolution;
+    if (cart_pixel_width % 2 == 0)
+        cart_min_range = (cart_pixel_width / 2 - 0.5) * cart_resolution;
+
+    cv::Mat map_x = cv::Mat::zeros(cart_pixel_width, cart_pixel_width, CV_32F);
+    cv::Mat map_y = cv::Mat::zeros(cart_pixel_width, cart_pixel_width, CV_32F);
+
+#pragma omp parallel for collapse(2)
+    for (int j = 0; j < map_y.cols; ++j) {
+        for (int i = 0; i < map_y.rows; ++i) {
+            map_y.at<float>(i, j) = -1 * cart_min_range + j * cart_resolution;
+        }
+    }
+
+#pragma omp parallel for collapse(2)
+    for (int i = 0; i < map_x.rows; ++i) {
+        for (int j = 0; j < map_x.cols; ++j) {
+            map_x.at<float>(i, j) = cart_min_range - i * cart_resolution;
+        }
+    }
+
+    std::vector<Eigen::MatrixXd> transforms(400);
+    transforms[0] = Eigen::MatrixXd::Identity(4, 4);
+
+#pragma omp parallel for
+    for (uint i = 1; i < transforms.size(); ++i) {
+        Eigen::MatrixXd T = se3ToSE3(wbar * times[i]);
+        transforms[i] = T.inverse();
+    }
+
+    cv::Mat orig_x = cv::Mat::zeros(cart_pixel_width, cart_pixel_width, CV_32F);
+    cv::Mat orig_y = cv::Mat::zeros(cart_pixel_width, cart_pixel_width, CV_32F);
+
+#pragma omp parallel for collapse(2)
+    for (int i = 0; i < orig_x.rows; ++i) {
+        for (int j = 0; j < orig_y.cols; ++j) {
+            float x = map_x.at<float>(i, j);
+            float y = map_y.at<float>(i, j);
+            float phi = atan2f(y, x);
+            if (phi < 0)
+                phi += 2 * M_PI;
+            int row = (phi - azimuths[0]) / azimuth_step;
+            Eigen::Vector4d pbar = {x, y, 0, 1};
+            pbar = transforms[row] * pbar;
+            float u = (cart_min_range + pbar(1)) / cart_resolution;
+            float v = (cart_min_range - pbar(0)) / cart_resolution;
+            orig_x.at<float>(i, j) = u;
+            orig_y.at<float>(i, j) = v;
+        }
+    }
+
+    cv::remap(input, output, orig_x, orig_y, cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
+}
+
 int main() {
     std::string root = "/home/keenan/Documents/data/2019-01-16-14-15-33-radar-oxford-10k";
     std::string radardir = root + "/radar";
@@ -150,12 +219,12 @@ int main() {
             y3.push_back(p1bar(1));
         }
 
-        std::map<std::string, std::string> kw3;
-        kw3.insert(std::pair<std::string, std::string>("c", "r"));
-        plt::scatter(x3, y3, 25.0, kw3);
-        std::map<std::string, std::string> kw2;
-        kw2.insert(std::pair<std::string, std::string>("c", "b"));
-        plt::scatter(x2, y2, 25.0, kw2);
+        // std::map<std::string, std::string> kw3;
+        // kw3.insert(std::pair<std::string, std::string>("c", "r"));
+        // plt::scatter(x3, y3, 25.0, kw3);
+        // std::map<std::string, std::string> kw2;
+        // kw2.insert(std::pair<std::string, std::string>("c", "b"));
+        // plt::scatter(x2, y2, 25.0, kw2);
         // plt::show();
 
         // Distort lidar points to be like radar points, plot on the cartesian radar image.
@@ -164,24 +233,28 @@ int main() {
 
         Eigen::MatrixXd pc_distort = Eigen::MatrixXd::Zero(2, pc.cols());
         for (uint j = 0; j < x3.size(); ++j) {
-            double azimuth = atan2(y3[j], x3[j]);
-            int closest = 0;
-            double diff = 1000;
-            for (uint k = 0; k < azimuths.size(); ++k) {
-                if (abs(azimuth - azimuths[k]) < diff) {
-                    diff = abs(azimuth - azimuths[k]);
-                    closest = k;
-                }
-            }
-            double delta_t = abs(t1[closest] - t1[0])/1000000.0;
-            Eigen::MatrixXd T = se3ToSE3(w_gt * delta_t);
+            // double azimuth = atan2(y3[j], x3[j]);
+            // int closest = 0;
+            // double diff = 1000;
+            // for (uint k = 0; k < azimuths.size(); ++k) {
+            //     if (abs(azimuth - azimuths[k]) < diff) {
+            //         diff = abs(azimuth - azimuths[k]);
+            //         closest = k;
+            //     }
+            // }
+            // double delta_t = abs(t1[closest] - t1[0])/1000000.0;
+            // Eigen::MatrixXd T = se3ToSE3(w_gt * delta_t);
             Eigen::Vector4d p1bar = {x3[j], y3[j], 0, 1};
-            p1bar = T.inverse() * p1bar;
+            // p1bar = T.inverse() * p1bar;
             pc_distort(0, j) = p1bar(0);
             pc_distort(1, j) = p1bar(1);
         }
+
+        cv::Mat undistort;
+        undistort_radar_image(cart_img, undistort, w_gt, cart_resolution, cart_pixel_width);
+
         cv::Mat vis;
-        draw_points(cart_img, pc_distort, cart_resolution, cart_pixel_width, vis);
+        draw_points(undistort, pc_distort, cart_resolution, cart_pixel_width, vis);
         cv::imshow("cart", vis);
         cv::waitKey(0);
     }
