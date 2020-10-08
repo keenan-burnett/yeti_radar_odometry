@@ -198,12 +198,12 @@ int main() {
                 continue;
 
             // Remove motion distortion from LIDAR data
-            double phi = atan2f(pc(1, j), pc(0, j));
-            if (phi < 0)
-                phi += 2 * M_PI;
-            // phi = 2 * M_PI - phi;
-            double timestamp = 0.1 * (phi / (2 * M_PI));
-            T_motion = se3ToSE3(wbar * timestamp);
+            // double phi = atan2f(pc(1, j), pc(0, j));
+            // if (phi < 0)
+            //     phi += 2 * M_PI;
+            // // phi = 2 * M_PI - phi;
+            // double timestamp = 0.1 * (phi / (2 * M_PI));
+            // T_motion = se3ToSE3(wbar * timestamp);
 
             Eigen::Vector4d p1bar = {pc(0, j), pc(1, j), 0, 1};
             p1bar = T_radar_lidar * T_motion * p1bar;

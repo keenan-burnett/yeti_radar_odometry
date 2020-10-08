@@ -132,7 +132,7 @@ int main(int argc, char *argv[]) {
         Ransac ransac(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
         srand(i);
         ransac.computeModel();
-        Eigen::MatrixXd T;
+        Eigen::MatrixXd T;  // T_1_2
         ransac.getTransform(T);
 
         std::vector<int> inliers;
