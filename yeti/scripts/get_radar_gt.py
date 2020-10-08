@@ -1,22 +1,26 @@
 import os
 import matplotlib.pyplot as plt
 import numpy as np
+import pickle
+from evaluate_odometry import get_inverse_tf
+from plot_scan_matching_accuracy import enforce_orthogonality
 
 # Given a ROS time (in seconds), ROS/GPS time synch parameters, and a ground truth file,
 # This function returns ground truth [rostime, x, y, theta, v, w] interpolated at the exact rostime.
-def get_groundtruth(rostime, synch_parameters, gtfile):
+def get_groundtruth(rostime, synch_parameters, gtlines, gt_times):
     gpstime = rostime - (synch_parameters[1] + synch_parameters[0] * rostime)
     print(gpstime)
 
-    lines = open(gtfile, 'r').read().splitlines()
+    # lines = open(gtfile, 'r').read().splitlines()
 
     diff = 0.1
     closest_time = -1
     closest_index = -1
-    for i in range(0, len(lines)):
-        line = lines[i]
-        parts = line.split(',')
-        gt_time = float(parts[0])
+    for i in range(0, len(gt_times)):
+        # line = gtlines[i]
+        # parts = line.split(',')
+        # gt_time = float(parts[0])
+        gt_time = gt_times[i]
         delta = abs(gpstime - gt_time)
         if delta < diff:
             diff = delta
@@ -31,8 +35,8 @@ def get_groundtruth(rostime, synch_parameters, gtfile):
     else:
         indices = [closest_index - 1, closest_index]
 
-    m1 = lines[indices[0]].split(',')
-    m2 = lines[indices[1]].split(',')
+    m1 = gtlines[indices[0]].split(',')
+    m2 = gtlines[indices[1]].split(',')
 
     t1 = float(m1[0])
     t2 = float(m2[0])
@@ -100,16 +104,33 @@ if __name__ == '__main__':
     p = np.polyfit(rostimes, deltas, deg=1)
     print('offset: {} skew: {}'.format(p[1], p[0]))
 
+
+    gtlines = open(gtfile, 'r').read().splitlines()
+    gt_times = []
+    for line in gtlines:
+        gt_times.append(float(line.split(',')[0]))
+
     groundtruth1 = []
     groundtruth2 = []
     for file in radar_files:
         timestamp = int(file.split('.')[0])
         timestamp /= 1.0e9
-
+        print(timestamp)
         if timestamp < 1602033998:
-            groundtruth1.append(get_groundtruth(timestamp, p, gtfile))
-        else if timestamp > 1602034049:
-            groundtruth2.append(get_groundtruth(timestamp, p, gtfile))
+            gt = get_groundtruth(timestamp, p, gtlines, gt_times)
+            gt[0] = int(file.split('.')[0])
+            groundtruth1.append(gt)
+        elif timestamp > 1602034049:
+            gt = get_groundtruth(timestamp, p, gtlines, gt_times)
+            gt[0] = int(file.split('.')[0])
+            groundtruth2.append(gt)
+
+    g1 = open(project + '/gt1', 'w')
+    g2 = open(project + '/gt2', 'w')
+    pickle.dump(groundtruth1, g1)
+    pickle.dump(groundtruth2, g2)
+    # groundtruth1 = pickle.load(g1)
+    # groundtruth2 = pickle.load(g2)
 
     outfile = project + '/radar_groundtruth.csv'
     f = open(outfile, 'w')
@@ -150,8 +171,9 @@ if __name__ == '__main__':
             w2 = groundtruth2[closest][5]
             T_i_r2 = get_transform(x2, y2, theta2)
 
-            T_r1_r2 = np.matmul(T_i_r1.inverse(), T_i_r2)
+            T_r1_r2 = np.matmul(get_inverse_tf(T_i_r1), T_i_r2)
 
-            yaw = -1 * np.arcsin(T_r1_r2[0, 1])
+            # yaw = -1 * np.arcsin(T_r1_r2[0, 1])
+            yaw = theta2 - theta
 
-            outfile.write('{},{},{},{},{},{},{},{},{}'.format(gt[0], gt2[0], T_r1_r2[0, 2], T_r1_r2[1, 2], yaw, v, w, v2, w2))
+            f.write('{},{},{},{},{},{},{},{},{},\n'.format(gt[0], gt2[0], T_r1_r2[0, 2], T_r1_r2[1, 2], yaw, v, w, v2, w2))
