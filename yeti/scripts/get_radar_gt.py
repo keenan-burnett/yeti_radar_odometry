@@ -110,27 +110,27 @@ if __name__ == '__main__':
     for line in gtlines:
         gt_times.append(float(line.split(',')[0]))
 
-    groundtruth1 = []
-    groundtruth2 = []
-    for file in radar_files:
-        timestamp = int(file.split('.')[0])
-        timestamp /= 1.0e9
-        print(timestamp)
-        if timestamp < 1602033998:
-            gt = get_groundtruth(timestamp, p, gtlines, gt_times)
-            gt[0] = int(file.split('.')[0])
-            groundtruth1.append(gt)
-        elif timestamp > 1602034049:
-            gt = get_groundtruth(timestamp, p, gtlines, gt_times)
-            gt[0] = int(file.split('.')[0])
-            groundtruth2.append(gt)
+    # groundtruth1 = []
+    # groundtruth2 = []
+    # for file in radar_files:
+    #     timestamp = int(file.split('.')[0])
+    #     timestamp /= 1.0e9
+    #     print(timestamp)
+    #     if timestamp < 1602033998:
+    #         gt = get_groundtruth(timestamp, p, gtlines, gt_times)
+    #         gt[0] = int(file.split('.')[0])
+    #         groundtruth1.append(gt)
+    #     elif timestamp > 1602034049:
+    #         gt = get_groundtruth(timestamp, p, gtlines, gt_times)
+    #         gt[0] = int(file.split('.')[0])
+    #         groundtruth2.append(gt)
 
-    g1 = open(project + '/gt1', 'w')
-    g2 = open(project + '/gt2', 'w')
-    pickle.dump(groundtruth1, g1)
-    pickle.dump(groundtruth2, g2)
-    # groundtruth1 = pickle.load(g1)
-    # groundtruth2 = pickle.load(g2)
+    g1 = open(project + '/gt1', 'r')
+    g2 = open(project + '/gt2', 'r')
+    # pickle.dump(groundtruth1, g1)
+    # pickle.dump(groundtruth2, g2)
+    groundtruth1 = pickle.load(g1)
+    groundtruth2 = pickle.load(g2)
 
     outfile = project + '/radar_groundtruth.csv'
     f = open(outfile, 'w')
@@ -164,11 +164,13 @@ if __name__ == '__main__':
 
             T_i_r1 = get_transform(x, y, theta)
 
+            time2 = groundtruth2[closest][0]
             x2 = groundtruth2[closest][1]
             y2 = groundtruth2[closest][2]
             theta2 = groundtruth2[closest][3]
             v2 = groundtruth2[closest][4]
             w2 = groundtruth2[closest][5]
+
             T_i_r2 = get_transform(x2, y2, theta2)
 
             T_r1_r2 = np.matmul(get_inverse_tf(T_i_r1), T_i_r2)
@@ -176,4 +178,4 @@ if __name__ == '__main__':
             # yaw = -1 * np.arcsin(T_r1_r2[0, 1])
             yaw = theta2 - theta
 
-            f.write('{},{},{},{},{},{},{},{},{},\n'.format(gt[0], gt2[0], T_r1_r2[0, 2], T_r1_r2[1, 2], yaw, v, w, v2, w2))
+            f.write('{},{},{},{},{},{},{},{},{},\n'.format(gt[0], time2, T_r1_r2[0, 2], T_r1_r2[1, 2], yaw, v, w, v2, w2))

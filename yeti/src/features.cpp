@@ -290,3 +290,91 @@ double cen2019features(cv::Mat fft_data, int max_points, int min_range, Eigen::M
     std::chrono::duration<double> e = t2 - t1;
     return e.count();
 }
+
+// Note: the dimensions of polar_points and cart_targets may not align
+// Runtime: 100 ms
+double cen2019descriptors(std::vector<double> azimuths, cv::Size polar_dims, Eigen::MatrixXd polar_points,
+    Eigen::MatrixXd cart_targets, float radar_resolution, float cart_resolution, int cart_pixel_width,
+    cv::Mat &descriptors, int navtech_version) {
+
+    auto t1 = std::chrono::high_resolution_clock::now();
+    // Create binary grid based on polar feature locations
+    cv::Mat polar_binary = cv::Mat::zeros(polar_dims.height, polar_dims.width, CV_32F);
+#pragma omp parallel for
+    for (uint i = 0; i < polar_points.cols(); ++i) {
+        polar_binary.at<float>(polar_points(0, i), polar_points(1, i)) = 1.0;
+    }
+    // Convert it to cartesian
+    cv::Mat cart_binary;
+    radar_polar_to_cartesian(azimuths, polar_binary, radar_resolution, cart_resolution, cart_pixel_width, true,
+        cart_binary, CV_32F, navtech_version);
+
+    // int M = polar_dims.height;
+    int M = 384;
+    float azimuth_step = (2 * M_PI) / float(M);
+    int N = 128;
+    float range_step = (cart_pixel_width / 2.0) / float(N);
+    float max_range_sq = pow(N * range_step, 2);
+
+    cv::Mat d1 = cv::Mat::zeros(cart_targets.cols(), M, CV_32F);
+    cv::Mat d2 = cv::Mat::zeros(cart_targets.cols(), N, CV_32F);
+
+    std::vector<cv::Point2f> bev_points;
+    convert_to_bev(cart_targets, cart_resolution, cart_pixel_width, bev_points);
+
+#pragma omp parallel for collapse(2)
+    for (int i = 0; i < cart_binary.rows; ++i) {
+        for (int j = 0; j < cart_binary.cols; ++j) {
+            if (cart_binary.at<float>(i, j) > 0) {
+                for (uint k = 0; k < bev_points.size(); ++k) {
+                    float range = pow(i - bev_points[k].y, 2) + pow(j - bev_points[k].x, 2);
+                    if (range > max_range_sq)
+                        continue;
+                    range = sqrt(range);
+                    float azimuth = atan2f(bev_points[k].y - i, j - bev_points[k].x);
+                    if (azimuth < 0)
+                        azimuth += 2 * M_PI;
+                    int azimuth_bin = azimuth / azimuth_step;
+                    int range_bin = range / range_step;
+#pragma omp atomic
+                    d1.at<float>(k, azimuth_bin)++;
+#pragma omp atomic
+                    d2.at<float>(k, range_bin)++;
+                }
+            }
+        }
+    }
+
+    // Calculate the FFT for each azimuth, normalize the magnitude
+#pragma omp parallel for
+    for (uint i = 0; i < cart_targets.cols(); ++i) {
+        cv::Mat row = cv::Mat::zeros(1, M, CV_32F);
+        for (int j = 0; j < M; ++j) {
+            row.at<float>(0, j) = d1.at<float>(i, j);
+        }
+        cv::Mat planes[] = {cv::Mat_<float>(row), cv::Mat::zeros(row.size(), CV_32F)};
+        cv::Mat complexI;
+        cv::merge(planes, 2, complexI);         // Add to the expanded another plane with zeros
+        cv::dft(complexI, complexI);            // this way the result may fit in the source matrix
+        cv::split(complexI, planes);
+        cv::magnitude(planes[0], planes[1], planes[0]);
+        cv::Mat magI = planes[0];
+        cv::normalize(magI, magI, 0, 1, cv::NORM_MINMAX);
+        for (int j = 0; j < M; ++j) {
+            d1.at<float>(i, j) = magI.at<float>(0, j);
+        }
+    }
+
+    // Normalize the counts for each range bin
+#pragma omp parallel for
+    for (uint i = 0; i < cart_targets.cols(); ++i) {
+        cv::normalize(d2.row(i), d2.row(i), 0, 1, cv::NORM_MINMAX);
+    }
+
+    cv::hconcat(d1, d2, descriptors);
+
+    auto t2 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> e = t2 - t1;
+    std::cout << e.count() << std::endl;
+    return e.count();
+}

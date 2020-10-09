@@ -1,6 +1,9 @@
 #pragma once
 #include <Eigen/Dense>
+#include <vector>
 #include <opencv2/core.hpp>
+// #include <opencv2/imgproc.hpp>
+// #include <opencv2/highgui.hpp>
 #include "radar_utils.hpp"
 
 /*!
@@ -32,3 +35,7 @@ double cen2018features(cv::Mat fft_data, float zq, int sigma_gauss, int min_rang
    \param targets [out] Matrix of feature locations (azimuth_bin, range_bin, 1) x N
 */
 double cen2019features(cv::Mat fft_data, int max_points, int min_range, Eigen::MatrixXd &targets);
+
+double cen2019descriptors(std::vector<double> azimuths, cv::Size polar_dims, Eigen::MatrixXd polar_points,
+    Eigen::MatrixXd cart_targets, float radar_resolution, float cart_resolution, int cart_pixel_width,
+    cv::Mat &descriptors, int navtech_version = CTS350);

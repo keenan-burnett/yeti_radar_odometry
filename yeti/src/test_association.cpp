@@ -6,11 +6,11 @@
 
 int main() {
     int N = 100;
-    double theta = M_PI / 6;
+    double theta = M_PI;
     Eigen::Matrix2d R;
     R << cos(theta), sin(theta), -sin(theta), cos(theta);
     std::cout << R << std::endl;
-    Eigen::Vector2d t = {1, 2};
+    Eigen::Vector2d t = {3, 5};
     Eigen::MatrixXd p1 = Eigen::MatrixXd::Random(2, N);
     Eigen::MatrixXd p2 = R * p1;
 

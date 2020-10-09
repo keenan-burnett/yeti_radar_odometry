@@ -161,3 +161,13 @@ target_link_libraries(showcase_distortion
 	matplotlibcpp
 )
 target_compile_definitions(showcase_distortion PRIVATE "-DWITHOUT_NUMPY")
+
+add_executable(test_localization src/test_localization.cpp)
+target_link_libraries(test_localization
+    features
+    radar_utils
+    association
+	${catkin_LIBRARIES}
+	${OpenCV_LIBRARIES}
+    yaml-cpp
+)

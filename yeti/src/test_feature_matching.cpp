@@ -128,6 +128,8 @@ int main(int argc, char *argv[]) {
         int64 time2 = std::stoll(parts[0]);
         double delta_t = (time2 - time1) / 1000000.0;
 
+        std::cout << time1 << " " << time2 << " " << delta_t << std::endl;
+
         // Compute the transformation using RANSAC
         Ransac ransac(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
         srand(i);

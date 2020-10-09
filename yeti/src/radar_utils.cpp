@@ -3,6 +3,8 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <fstream>
+#include <iostream>
+#include <string>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include "radar_utils.hpp"
@@ -50,13 +52,27 @@ void load_radar(std::string path, std::vector<int64_t> &timestamps, std::vector<
     azimuths = std::vector<double>(N, 0);
     valid = std::vector<bool>(N, true);
     int range_bins = 3768;
-    if (navtech_version == CIR204)
+    double azimuth_step = M_PI / 200;
+    int64_t time_step = 625;
+    int64 time_end = 0;
+    if (navtech_version == CIR204) {
         range_bins = 3360;
+        std::vector<std::string> parts;
+        boost::split(parts, path, boost::is_any_of("."));
+        std::string fname = parts[0];
+        boost::split(parts, fname, boost::is_any_of("/"));
+        time_end = std::stoll(parts[parts.size() - 1]) / 1000;
+    }
     fft_data = cv::Mat::zeros(N, range_bins, CV_32F);
     for (int i = 0; i < N; ++i) {
         uchar* byteArray = raw_example_data.ptr<uchar>(i);
-        timestamps[i] = *((int64_t *)(byteArray));
-        azimuths[i] = *((uint16_t *)(byteArray + 8)) * 2 * M_PI / double(encoder_size);
+        if (navtech_version == CIR204) {
+            azimuths[i] = i * azimuth_step;
+            timestamps[i] = time_end - (N - i) * time_step;
+        } else {
+            timestamps[i] = *((int64_t *)(byteArray));
+            azimuths[i] = *((uint16_t *)(byteArray + 8)) * 2 * M_PI / double(encoder_size);
+        }
         valid[i] = byteArray[10] == 255;
         for (int j = 42; j < range_bins; j++) {
             fft_data.at<float>(i, j) = (float)*(byteArray + 11 + j) / 255.0;
