@@ -7,10 +7,14 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/features2d.hpp>
-// #include <opencv2/core/eigen.hpp>
+#include <Eigen/Dense>
+#include <opencv2/core/eigen.hpp>
+#include <nanoflann.hpp>
 #include "radar_utils.hpp"
 #include "features.hpp"
 #include "association.hpp"
+
+typedef nanoflann::KDTreeEigenMatrixAdaptor<Eigen::MatrixXf> my_kd_tree_t;
 
 int main(int argc, char *argv[]) {
     std::string root = "/home/keenan/Documents/data/boreas/2020_10_06";
@@ -48,7 +52,8 @@ int main(int argc, char *argv[]) {
     cv::Ptr<cv::ORB> detector = cv::ORB::create();
     detector->setPatchSize(patch_size);
     detector->setEdgeThreshold(patch_size);
-    cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
+    // cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
+    cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE);
 
     cv::Mat img1, img2, desc1, desc2;
     std::vector<cv::KeyPoint> kp1, kp2;
@@ -100,44 +105,80 @@ int main(int argc, char *argv[]) {
             radar_resolution, cart_res2, cart_width2, desc2);
 
         // Match keypoint descriptors
-        // std::vector<std::vector<cv::DMatch>> knn_matches;
-        // matcher->knnMatch(desc1, desc2, knn_matches, 2);
+        std::vector<std::vector<cv::DMatch>> knn_matches;
+        matcher->knnMatch(desc1, desc2, knn_matches, 2);
 
-        std::vector<cv::DMatch> good_matches;
-        Eigen::Map<Eigen::MatrixXf> d1(desc1.ptr<float>(), desc1.rows, desc1.cols);
-        Eigen::Map<Eigen::MatrixXf> d2(desc2.ptr<float>(), desc2.rows, desc2.cols);
+        // Eigen::MatrixXf d1, d2;
+        // cv2eigen(desc1, d1);
+        // cv2eigen(desc2, d2);
+        //
+        // d1 = Eigen::MatrixXf::Random(d1.rows(), 3);
+        // d2 = Eigen::MatrixXf::Random(d2.rows(), 3);
+        //
+        // std::cout << "d1: " << d1.rows() << " " << d1.cols() << std::endl;
+        // std::cout << "d2: " << d2.rows() << " " << d2.cols() << std::endl;
+        //
+        // // Eigen::Map<Eigen::MatrixXf> d1(desc1.ptr<float>(), desc1.rows, desc1.cols);
+        // // Eigen::Map<Eigen::MatrixXf> d2(desc2.ptr<float>(), desc2.rows, desc2.cols);
+        //
+        // int dim = d2.cols();
+        // my_kd_tree_t mat_index(dim, std::cref(d2), 10);
+        // mat_index.index->buildIndex();
+        //
+        // std::cout << "built kdtree" << std::endl;
+        //
+        // const size_t num_results = 2;
+        // std::vector<size_t> ret_indexes(num_results);
+        // std::vector<float> out_dists_sqr(num_results);
+        // nanoflann::KNNResultSet<float> resultSet(num_results);
+        // resultSet.init(&ret_indexes[0], &out_dists_sqr[0]);
+        //
+        // std::vector<std::vector<cv::DMatch>> knn_matches(d1.rows());
+        // for (uint j = 0; j < d1.rows(); ++j) {
+        //     std::vector<float> query_pt(dim);
+        //     for (size_t d = 0; d < dim; ++d) {
+        //         query_pt[d] = d1(j, d);
+        //     }
+        //     mat_index.index->findNeighbors(resultSet, &query_pt[0], nanoflann::SearchParams(10));
+        //     knn_matches[j].clear();
+        //     knn_matches[j].push_back(cv::DMatch(j, ret_indexes[0], sqrt(out_dists_sqr[0])));
+        //     knn_matches[j].push_back(cv::DMatch(j, ret_indexes[1], sqrt(out_dists_sqr[1])));
+        //     std::cout << j << " " << ret_indexes[0] << " " << ret_indexes[1] << " " << out_dists_sqr[0] << " " << out_dists_sqr[1] << std::endl;
+        // }
+        //
+        // std::cout << "survived" << std::endl;
 
-        int d = d1.cols();
-        for (uint j = 0; j < cart_targets2.cols(); ++j) {
-            float minD = 1.0e6;
-            int best = -1;
-            for (uint k = 0; k < cart_targets1.cols(); ++k) {
-                float e = (d1.block(k, 0, 1, d) - d2.block(j, 0, 1, d)).squaredNorm();
-                if (e < minD) {
-                    minD = e;
-                    best = k;
-                }
-            }
-            if (best >= 0)
-                good_matches.push_back(cv::DMatch(best, j, minD));
-        }
-
-        std::cout << "finish" << std::endl;
+        // std::vector<cv::DMatch> good_matches;
+        // for (uint j = 0; j < cart_targets2.cols(); ++j) {
+        //     float minD = 1.0e6;
+        //     int best = -1;
+        //     for (uint k = 0; k < cart_targets1.cols(); ++k) {
+        //         float e = (d1.block(k, 0, 1, d) - d2.block(j, 0, 1, d)).squaredNorm();
+        //         if (e < minD) {
+        //             minD = e;
+        //             best = k;
+        //         }
+        //     }
+        //     if (best >= 0)
+        //         good_matches.push_back(cv::DMatch(best, j, minD));
+        // }
+        //
+        // std::cout << "finish" << std::endl;
 
         // Filter matches using nearest neighbor distance ratio (Lowe, Szeliski)
-        // std::vector<cv::DMatch> good_matches;
-        // for (uint j = 0; j < knn_matches.size(); ++j) {
-        //     if (!knn_matches[j].size())
-        //         continue;
-        //     if (knn_matches[j][0].distance < nndr * knn_matches[j][1].distance) {
-        //         good_matches.push_back(knn_matches[j][0]);
-        //     }
-        // }
+        std::vector<cv::DMatch> good_matches;
+        for (uint j = 0; j < knn_matches.size(); ++j) {
+            if (!knn_matches[j].size())
+                continue;
+            if (knn_matches[j][0].distance < nndr * knn_matches[j][1].distance) {
+                good_matches.push_back(knn_matches[j][0]);
+            }
+        }
         // Convert the good key point matches to Eigen matrices
         Eigen::MatrixXd p1 = Eigen::MatrixXd::Zero(2, good_matches.size());
         Eigen::MatrixXd p2 = p1;
         std::vector<int64_t> t1prime = t1, t2prime = t2;
-        for (uint j = 0; j < 500; ++j) {
+        for (uint j = 0; j < good_matches.size(); ++j) {
             p1(0, j) = cart_targets1(0, good_matches[j].queryIdx);
             p1(1, j) = cart_targets1(1, good_matches[j].queryIdx);
             p2(0, j) = cart_targets2(0, good_matches[j].trainIdx);
@@ -209,7 +250,7 @@ int main(int argc, char *argv[]) {
 
         cv::Mat img_matches;
         cv::drawMatches(img1, kp1, img2, kp2, good_matches, img_matches, cv::Scalar::all(-1),
-                 cv::Scalar::all(-1), std::vector<char>());
+                 cv::Scalar::all(-1), std::vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
         cv::imshow("good", img_matches);
         cv::waitKey(0);
     }

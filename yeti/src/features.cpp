@@ -370,8 +370,8 @@ double cen2019descriptors(std::vector<double> azimuths, cv::Size polar_dims, Eig
     for (uint i = 0; i < cart_targets.cols(); ++i) {
         cv::normalize(d2.row(i), d2.row(i), 0, 1, cv::NORM_MINMAX);
     }
-
-    cv::hconcat(d1, d2, descriptors);
+    // cv::hconcat(d1, d2, descriptors);
+    descriptors = d2;
 
     auto t2 = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> e = t2 - t1;

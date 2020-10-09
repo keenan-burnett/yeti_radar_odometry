@@ -15,13 +15,13 @@ max_points: 10000
 keypoint_extraction: 0	# 0: cen2018, 1: cen2019, 2: orb
 
 # ORB feature parameters
-patch_size: 31	# width of patch in pixels in cartesian radar image
-nndr: 0.8	# Nearest neighbor distance ratio
+patch_size: 21	# width of patch in pixels in cartesian radar image
+nndr: 0.95	# Nearest neighbor distance ratio
 
 # RANSAC
 threshold: 0.35
 inlier_ratio: 0.90
-max_iterations: 10000
+max_iterations: 100
 
 # MDRANSAC
 max_gn_iterations: 10

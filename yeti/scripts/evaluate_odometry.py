@@ -169,11 +169,12 @@ if __name__ == '__main__':
     #     afile = sys.argv[1]
     # print(afile)
 
-    ff = os.listdir('.')
-    files = []
-    for f in ff:
-        if 'accuracy' in f:
-            files.append(f)
+    # ff = os.listdir('.')
+    # files = []
+    # for f in ff:
+    #     if 'accuracy' in f:
+    #         files.append(f)
+    files = ['accuracy.csv']
 
     err_rigid = []
     err_md = []
@@ -236,7 +237,7 @@ if __name__ == '__main__':
     saveSequenceErrors(err_md, 'pose_error_mdransac.csv')
     saveSequenceErrors(err_dopp, 'pose_error_dopp.csv')
     saveErrorPlots([err_rigid, err_md, err_dopp], 'pose_error.png')
-    t_err, r_err = getStats(err)
+    t_err, r_err = getStats(err_rigid)
     print('RIGID:')
     print('t_err: {} %'.format(t_err * 100))
     print('r_err: {} deg/m'.format(r_err * 180 / np.pi))
