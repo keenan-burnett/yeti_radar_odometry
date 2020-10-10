@@ -365,6 +365,33 @@ double cen2019descriptors(std::vector<double> azimuths, cv::Size polar_dims, Eig
         }
     }
 
+// #pragma omp parallel for
+//     // Reorder with the densest column first
+//     for (uint i = 0; i < cart_targets.cols(); ++i) {
+//         float max = 0;
+//         int max_col = 0;
+//         for (int j = 0; j < M; ++j) {
+//             if (d1.at<float>(i, j) > max) {
+//                 max = d1.at<float>(i, j);
+//                 max_col = j;
+//             }
+//         }
+//         cv::Mat row = cv::Mat::zeros(1, M, CV_32F);
+//         int k = 0;
+//         for (int j = max_col; j < M; ++j) {
+//             row.at<float>(0, k) = d1.at<float>(i, j);
+//             k++;
+//         }
+//         for (int j = 0; j < max_col; ++j) {
+//             row.at<float>(0, k) = d1.at<float>(i, j);
+//             k++;
+//         }
+//         cv::normalize(row, row, 0, 1, cv::NORM_MINMAX);
+//         for (int j = 0; j < M; ++j) {
+//             d1.at<float>(i, j) = row.at<float>(0, j);
+//         }
+//     }
+
     // Normalize the counts for each range bin
 #pragma omp parallel for
     for (uint i = 0; i < cart_targets.cols(); ++i) {

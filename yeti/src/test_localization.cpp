@@ -7,14 +7,58 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/features2d.hpp>
-#include <Eigen/Dense>
-#include <opencv2/core/eigen.hpp>
-#include <nanoflann.hpp>
 #include "radar_utils.hpp"
 #include "features.hpp"
 #include "association.hpp"
 
-typedef nanoflann::KDTreeEigenMatrixAdaptor<Eigen::MatrixXf> my_kd_tree_t;
+void removeDoppler(Eigen::MatrixXd &p, double v, double beta) {
+    for (uint j = 0; j < p.cols(); ++j) {
+        double rsq = p(0, j) * p(0, j) + p(1, j) * p(1, j);
+        p(0, j) -= beta * v * p(0, j) * p(0, j) / rsq;
+        p(1, j) -= beta * v * p(0, j) * p(1, j) / rsq;
+    }
+}
+
+void removeMotionDistortion(Eigen::MatrixXd &p, std::vector<int64_t> tprime, Eigen::VectorXd wbar, int64_t t_ref) {
+    for (uint j = 0; j < p.cols(); ++j) {
+        double delta_t = (tprime[j] - t_ref) / 1000000.0;
+        Eigen::MatrixXd T = se3ToSE3(wbar * delta_t);
+        Eigen::Vector4d pbar = {p(0, j), p(1, j), 0, 1};
+        pbar = T * pbar;
+        p(0, j) = pbar(0);
+        p(1, j) = pbar(1);
+    }
+}
+
+double getRotation(Eigen::MatrixXd T) {
+    Eigen::MatrixXd Cmin = T.block(0, 0, 2, 2);
+    Eigen::MatrixXd C = Eigen::MatrixXd::Identity(3, 3);
+    C.block(0, 0, 2, 2) = Cmin;
+    Eigen::MatrixXcd Cc = C.cast<std::complex<double>>();
+    Eigen::ComplexEigenSolver<Eigen::MatrixXcd> ces;
+    ces.compute(Cc);
+    int idx = -1;
+    Eigen::VectorXcd evalues = ces.eigenvalues();
+    Eigen::MatrixXcd evectors = ces.eigenvectors();
+    for (int i = 0; i < 3; ++i) {
+        if (evalues(i, 0).real() != 0 && evalues(i, 0).imag() == 0) {
+            idx = i;
+            break;
+        }
+    }
+    assert(idx != -1);
+    Eigen::VectorXd abar = Eigen::Vector3d::Zero();
+    for (int i = 0; i < abar.rows(); ++i) {
+        abar(i, 0) = evectors(i, idx).real();
+    }
+    abar.normalize();
+    double trace = 0;
+    for (int i = 0; i < C.rows(); ++i) {
+        trace += C(i, i);
+    }
+    double phi = acos((trace - 1) / 2);
+    return phi;
+}
 
 int main(int argc, char *argv[]) {
     std::string root = "/home/keenan/Documents/data/boreas/2020_10_06";
@@ -52,7 +96,6 @@ int main(int argc, char *argv[]) {
     cv::Ptr<cv::ORB> detector = cv::ORB::create();
     detector->setPatchSize(patch_size);
     detector->setEdgeThreshold(patch_size);
-    // cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
     cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE);
 
     cv::Mat img1, img2, desc1, desc2;
@@ -60,7 +103,7 @@ int main(int argc, char *argv[]) {
     Eigen::MatrixXd targets, cart_targets1, cart_targets2;
     std::vector<int64_t> t1, t2;
 
-    std::vector<int64_t> times;
+    std::vector<int64_t> times1, times2;
     std::vector<double> azimuths;
     std::vector<bool> valid;
     cv::Mat fft_data;
@@ -82,11 +125,11 @@ int main(int argc, char *argv[]) {
 
         std::string radar_file1 = parts[0] + ".png";
 
-        load_radar(datadir + "/" + radar_file1, times, azimuths, valid, fft_data, CIR204);
+        load_radar(datadir + "/" + radar_file1, times1, azimuths, valid, fft_data, CIR204);
         cen2018features(fft_data, zq, sigma_gauss, min_range, targets);
         radar_polar_to_cartesian(azimuths, fft_data, radar_resolution, cart_resolution, cart_pixel_width, interp,
             img1, CV_8UC1, CIR204);
-        polar_to_cartesian_points(azimuths, times, targets, radar_resolution, cart_targets1, t1);
+        polar_to_cartesian_points(azimuths, times1, targets, radar_resolution, cart_targets1, t1);
         convert_to_bev(cart_targets1, cart_resolution, cart_pixel_width, patch_size, kp1, t1);
         // detector->compute(img1, kp1, desc1);
         cen2019descriptors(azimuths, cv::Size(fft_data.cols, fft_data.rows), targets, cart_targets1,
@@ -94,11 +137,11 @@ int main(int argc, char *argv[]) {
 
         std::string radar_file2 = parts[1] + ".png";
 
-        load_radar(datadir + "/" + radar_file2, times, azimuths, valid, fft_data, CIR204);
+        load_radar(datadir + "/" + radar_file2, times2, azimuths, valid, fft_data, CIR204);
         cen2018features(fft_data, zq, sigma_gauss, min_range, targets);
         radar_polar_to_cartesian(azimuths, fft_data, radar_resolution, cart_resolution, cart_pixel_width, interp, img2,
             CV_8UC1, CIR204);
-        polar_to_cartesian_points(azimuths, times, targets, radar_resolution, cart_targets2, t2);
+        polar_to_cartesian_points(azimuths, times2, targets, radar_resolution, cart_targets2, t2);
         convert_to_bev(cart_targets2, cart_resolution, cart_pixel_width, patch_size, kp2, t2);
         // detector->compute(img2, kp2, desc2);
         cen2019descriptors(azimuths, cv::Size(fft_data.cols, fft_data.rows), targets, cart_targets2,
@@ -107,63 +150,6 @@ int main(int argc, char *argv[]) {
         // Match keypoint descriptors
         std::vector<std::vector<cv::DMatch>> knn_matches;
         matcher->knnMatch(desc1, desc2, knn_matches, 2);
-
-        // Eigen::MatrixXf d1, d2;
-        // cv2eigen(desc1, d1);
-        // cv2eigen(desc2, d2);
-        //
-        // d1 = Eigen::MatrixXf::Random(d1.rows(), 3);
-        // d2 = Eigen::MatrixXf::Random(d2.rows(), 3);
-        //
-        // std::cout << "d1: " << d1.rows() << " " << d1.cols() << std::endl;
-        // std::cout << "d2: " << d2.rows() << " " << d2.cols() << std::endl;
-        //
-        // // Eigen::Map<Eigen::MatrixXf> d1(desc1.ptr<float>(), desc1.rows, desc1.cols);
-        // // Eigen::Map<Eigen::MatrixXf> d2(desc2.ptr<float>(), desc2.rows, desc2.cols);
-        //
-        // int dim = d2.cols();
-        // my_kd_tree_t mat_index(dim, std::cref(d2), 10);
-        // mat_index.index->buildIndex();
-        //
-        // std::cout << "built kdtree" << std::endl;
-        //
-        // const size_t num_results = 2;
-        // std::vector<size_t> ret_indexes(num_results);
-        // std::vector<float> out_dists_sqr(num_results);
-        // nanoflann::KNNResultSet<float> resultSet(num_results);
-        // resultSet.init(&ret_indexes[0], &out_dists_sqr[0]);
-        //
-        // std::vector<std::vector<cv::DMatch>> knn_matches(d1.rows());
-        // for (uint j = 0; j < d1.rows(); ++j) {
-        //     std::vector<float> query_pt(dim);
-        //     for (size_t d = 0; d < dim; ++d) {
-        //         query_pt[d] = d1(j, d);
-        //     }
-        //     mat_index.index->findNeighbors(resultSet, &query_pt[0], nanoflann::SearchParams(10));
-        //     knn_matches[j].clear();
-        //     knn_matches[j].push_back(cv::DMatch(j, ret_indexes[0], sqrt(out_dists_sqr[0])));
-        //     knn_matches[j].push_back(cv::DMatch(j, ret_indexes[1], sqrt(out_dists_sqr[1])));
-        //     std::cout << j << " " << ret_indexes[0] << " " << ret_indexes[1] << " " << out_dists_sqr[0] << " " << out_dists_sqr[1] << std::endl;
-        // }
-        //
-        // std::cout << "survived" << std::endl;
-
-        // std::vector<cv::DMatch> good_matches;
-        // for (uint j = 0; j < cart_targets2.cols(); ++j) {
-        //     float minD = 1.0e6;
-        //     int best = -1;
-        //     for (uint k = 0; k < cart_targets1.cols(); ++k) {
-        //         float e = (d1.block(k, 0, 1, d) - d2.block(j, 0, 1, d)).squaredNorm();
-        //         if (e < minD) {
-        //             minD = e;
-        //             best = k;
-        //         }
-        //     }
-        //     if (best >= 0)
-        //         good_matches.push_back(cv::DMatch(best, j, minD));
-        // }
-        //
-        // std::cout << "finish" << std::endl;
 
         // Filter matches using nearest neighbor distance ratio (Lowe, Szeliski)
         std::vector<cv::DMatch> good_matches;
@@ -189,70 +175,95 @@ int main(int argc, char *argv[]) {
         t1prime.resize(good_matches.size());
         t2prime.resize(good_matches.size());
 
-        // double delta_t = (time2 - time1) / 1.0e6;
-        double delta_t = 0.25;
-
-        std::cout << time1 << " " << time2 << " " << delta_t << std::endl;
-
         // Compute the transformation using RANSAC
         Ransac ransac(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
         srand(i);
         ransac.computeModel();
-        Eigen::MatrixXd T;  // T_1_2
-        ransac.getTransform(T);
+        Eigen::MatrixXd T1;  // T_1_2
+        ransac.getTransform(T1);
 
         std::vector<int> inliers;
-        ransac.getInliers(T, inliers);
+        ransac.getInliers(T1, inliers);
         std::cout << "rigid inliers: " << inliers.size() << std::endl;
 
-        // Compute the transformation using motion-distorted RANSAC
-        // MotionDistortedRansac mdransac(p2, p1, t2prime, t1prime, md_threshold, inlier_ratio, max_iterations);
-        // mdransac.setMaxGNIterations(max_gn_iterations);
-        // mdransac.correctForDoppler(false);
-        // srand(i);
-        // mdransac.computeModel();
-        Eigen::MatrixXd Tmd = Eigen::MatrixXd::Zero(4, 4);
-        // mdransac.getTransform(delta_t, Tmd);
-        // Tmd = Tmd.inverse();
-        //
-        // Eigen::VectorXd wbar;
-        // mdransac.getMotion(wbar);
-        // inliers.clear();
-        // mdransac.getInliers(wbar, inliers);
-        // std::cout << "mdransac inliers: " << inliers.size() << std::endl;
-        //
-        // // MDRANSAC + Doppler
-        // mdransac.correctForDoppler(true);
-        // mdransac.setDopplerParameter(beta);
-        // srand(i);
-        // mdransac.computeModel();
-        Eigen::MatrixXd Tmd2 = Eigen::MatrixXd::Zero(4, 4);
-        // mdransac.getTransform(delta_t, Tmd2);
-        // Tmd2 = Tmd2.inverse();
+        Eigen::MatrixXd p1temp = p1, p2temp = p2;
+
+        // Remove Doppler effects (first)
+        double v1 = gtvec[3];
+        double v2 = gtvec[5];
+        removeDoppler(p1, v1, beta);
+        removeDoppler(p2, v2, beta);
+        Ransac ransac2(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
+        srand(i);
+        ransac2.computeModel();
+        Eigen::MatrixXd T2;  // T_1_2
+        ransac2.getTransform(T2);
+
+        // Remove motion distortion from the pointclouds (second)
+        Eigen::VectorXd wbar1 = Eigen::VectorXd::Zero(6);
+        wbar1(0) = gtvec[3];
+        wbar1(5) = gtvec[4];
+        removeMotionDistortion(p1, t1prime, wbar1, time1);
+        Eigen::VectorXd wbar2 = Eigen::VectorXd::Zero(6);
+        wbar2(0) = gtvec[5];
+        wbar2(5) = gtvec[6];
+        removeMotionDistortion(p2, t2prime, wbar2, time2);
+        Ransac ransac3(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
+        srand(i);
+        ransac3.computeModel();
+        Eigen::MatrixXd T3;  // T_1_2
+        ransac3.getTransform(T3);
+
+        // Remove motion distortion (first)
+        p1 = p1temp;
+        p2 = p2temp;
+        removeMotionDistortion(p1, t1prime, wbar1, time1);
+        removeMotionDistortion(p2, t1prime, wbar1, time1);
+        Ransac ransac4(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
+        srand(i);
+        ransac4.computeModel();
+        Eigen::MatrixXd T4;  // T_1_2
+        ransac4.getTransform(T4);
+
+        // Remove Doppler effects (second)
+        removeDoppler(p1, v1, beta);
+        removeDoppler(p2, v2, beta);
+        Ransac ransac5(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
+        srand(i);
+        ransac5.computeModel();
+        Eigen::MatrixXd T5;  // T_1_2
+        ransac5.getTransform(T5);
 
         // Retrieve the ground truth to calculate accuracy
-        float yaw = -1 * asin(T(0, 1));
-        float yaw2 = -1 * asin(Tmd(0, 1));
-        float yaw3 = -1 * asin(Tmd2(0, 1));
+        float yaw = getRotation(T1);
+        float yaw2 = getRotation(T2);
+        float yaw3 = getRotation(T3);
+        float yaw4 = getRotation(T4);
+        float yaw5 = getRotation(T5);
 
         // Write estimated and ground truth transform to the csv file
-        ofs << T(0, 2) << "," << T(1, 2) << "," << yaw << ",";
-        ofs << gtvec[0] << "," << gtvec[1] << "," << gtvec[2] << ",";
-        ofs << time1 << "," << time2 << "," << Tmd(0, 3) << "," << Tmd(1, 3) << "," <<  yaw2 << ",";
-        ofs << Tmd2(0, 3) << "," << Tmd2(1, 3) << "," << yaw3 << "," << gtvec[3] << "," << gtvec[4];
-        ofs << "," << gtvec[5] << "," << gtvec[6] <<   "\n";
+        ofs << T1(0, 2) << "," << T1(1, 2) << "," << yaw << ",";
+        ofs << T2(0, 2) << "," << T2(1, 2) << "," << yaw2 << ",";
+        ofs << T3(0, 2) << "," << T3(1, 2) << "," << yaw3 << ",";
+        ofs << T4(0, 2) << "," << T4(1, 2) << "," << yaw4 << ",";
+        ofs << T5(0, 2) << "," << T5(1, 2) << "," << yaw5 << ",";
+        ofs << gtvec[0] << "," << gtvec[1] << "," << gtvec[2] << "," << time1 << "," << time2 << ",";
+        ofs << gtvec[3] << "," << gtvec[4] << "," << gtvec[5] << "," << gtvec[6] << "\n";
 
         i++;
 
-        std::cout << gtvec[0] << "," << gtvec[1] << "," << gtvec[2] << std::endl;
-        std::cout << T(0, 2) << "," << T(1, 2) << "," << yaw << std::endl;
-        std::cout << Tmd(0, 3) << "," << Tmd(1, 3) << "," <<  yaw2 << std::endl;
+        std::cout << "GT: " << gtvec[0] << "," << gtvec[1] << "," << gtvec[2] << std::endl;
+        std::cout << "RIGID: " << T1(0, 2) << "," << T1(1, 2) << "," << yaw << std::endl;
+        std::cout << "DOPP: " << T2(0, 2) << "," << T2(1, 2) << "," << yaw2 << std::endl;
+        std::cout << "DOPP + MD: " << T3(0, 2) << "," << T3(1, 2) << "," << yaw3 << std::endl;
+        std::cout << "MD: " << T4(0, 2) << "," << T4(1, 2) << "," << yaw4 << std::endl;
+        std::cout << "MD + DOPP: " << T5(0, 2) << "," << T5(1, 2) << "," << yaw5 << std::endl;
 
-        cv::Mat img_matches;
-        cv::drawMatches(img1, kp1, img2, kp2, good_matches, img_matches, cv::Scalar::all(-1),
-                 cv::Scalar::all(-1), std::vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
-        cv::imshow("good", img_matches);
-        cv::waitKey(0);
+        // cv::Mat img_matches;
+        // cv::drawMatches(img1, kp1, img2, kp2, good_matches, img_matches, cv::Scalar::all(-1),
+        //          cv::Scalar::all(-1), std::vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+        // cv::imshow("good", img_matches);
+        // cv::waitKey(0);
     }
 
     return 0;
