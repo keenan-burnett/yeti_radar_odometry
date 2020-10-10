@@ -1,8 +1,15 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+def getRotDiff(r1, r2):
+    if r1 < 0:
+        r1 = r1 + 2 * np.pi
+    if r2 < 0:
+        r2 = r2 + 2 * np.pi
+    return abs(r1 - r2)
+
 if __name__ == "__main__":
-    file = "localization_accuracy2.csv"
+    file = "localization_accuracy4.csv"
 
     dt1 = []
     dt2 = []
@@ -16,6 +23,7 @@ if __name__ == "__main__":
     dr5 = []
 
     threshold = 15
+    rot_hold = 10
 
     with open(file, 'r') as f:
         f.readline()
@@ -25,33 +33,43 @@ if __name__ == "__main__":
             gty = float(row[16])
             gtr = np.sqrt(gtx**2 + gty**2)
             gtyaw = float(row[17])
-            if gtyaw < 0:
-                gtyaw = gtyaw + 2 * np.pi
+            # if gtyaw < 0:
+                # gtyaw = gtyaw + 2 * np.pi
 
             dt = np.sqrt((gtx - float(row[0]))**2 + (gty - float(row[1]))**2)
             if dt < threshold:
                 dt1.append(dt / gtr)
-                dr1.append(180 * abs(gtyaw - float(row[2])) / np.pi)
+                dr = 180 * getRotDiff(gtyaw, float(row[2])) / np.pi
+                if dr < rot_hold:
+                    dr1.append(dr)
 
             dt = np.sqrt((gtx - float(row[3]))**2 + (gty - float(row[4]))**2)
             if dt < threshold:
                 dt2.append(dt / gtr)
-                dr2.append(180 * abs(gtyaw - float(row[5])) / np.pi)
+                dr = 180 * getRotDiff(gtyaw, float(row[5])) / np.pi
+                if dr < rot_hold:
+                    dr2.append(dr)
 
             dt = np.sqrt((gtx - float(row[6]))**2 + (gty - float(row[7]))**2)
             if dt < threshold:
                 dt3.append(dt / gtr)
-                dr3.append(180 * abs(gtyaw - float(row[8])) / np.pi)
+                dr = 180 * getRotDiff(gtyaw, float(row[8])) / np.pi
+                if dr < rot_hold:
+                    dr3.append(dr)
 
             dt = np.sqrt((gtx - float(row[9]))**2 + (gty - float(row[10]))**2)
             if dt < threshold:
                 dt4.append(dt / gtr)
-                dr4.append(180 * abs(gtyaw - float(row[11])) / np.pi)
+                dr = 180 * getRotDiff(gtyaw, float(row[11])) / np.pi
+                if dr < rot_hold:
+                    dr4.append(dr)
 
             dt = np.sqrt((gtx - float(row[12]))**2 + (gty - float(row[13]))**2)
             if dt < threshold:
                 dt5.append(dt / gtr)
-                dr5.append(180 * abs(gtyaw - float(row[14])) / np.pi)
+                dr = 180 * getRotDiff(gtyaw, float(row[14])) / np.pi
+                if dr < rot_hold:
+                    dr5.append(dr)
 
     dt1 = np.array(dt1)
     dt2 = np.array(dt2)
@@ -70,5 +88,5 @@ if __name__ == "__main__":
     print('MD ONLY: {} sigma_dt: {} dr: {} sigma_dr: {}'.format(np.median(dt4), np.mean((dt4 - np.median(dt4))**2), np.median(dr4), np.mean((dr4 - np.median(dr4))**2)))
     print('MD + DOPP: {} sigma_dt: {} dr: {} sigma_dr: {}'.format(np.median(dt5), np.mean((dt5 - np.median(dt5))**2), np.median(dr5), np.mean((dr5 - np.median(dr5))**2)))
 
-    plt.hist(dr1, 25)
+    plt.hist(dt1, 25)
     plt.show()

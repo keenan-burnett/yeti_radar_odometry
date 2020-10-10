@@ -30,33 +30,28 @@ void removeMotionDistortion(Eigen::MatrixXd &p, std::vector<int64_t> tprime, Eig
     }
 }
 
+Eigen::MatrixXd computeAndGetTransform(Eigen::MatrixXd p2, Eigen::MatrixXd p1, double ransac_threshold,
+    double inlier_ratio, int max_iterations){
+    Ransac ransac(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
+    ransac.computeModel();
+    Eigen::MatrixXd T;
+    ransac.getTransform(T);
+    return T;
+}
+
 double getRotation(Eigen::MatrixXd T) {
     Eigen::MatrixXd Cmin = T.block(0, 0, 2, 2);
     Eigen::MatrixXd C = Eigen::MatrixXd::Identity(3, 3);
     C.block(0, 0, 2, 2) = Cmin;
-    Eigen::MatrixXcd Cc = C.cast<std::complex<double>>();
-    Eigen::ComplexEigenSolver<Eigen::MatrixXcd> ces;
-    ces.compute(Cc);
-    int idx = -1;
-    Eigen::VectorXcd evalues = ces.eigenvalues();
-    Eigen::MatrixXcd evectors = ces.eigenvectors();
-    for (int i = 0; i < 3; ++i) {
-        if (evalues(i, 0).real() != 0 && evalues(i, 0).imag() == 0) {
-            idx = i;
-            break;
-        }
-    }
-    assert(idx != -1);
-    Eigen::VectorXd abar = Eigen::Vector3d::Zero();
-    for (int i = 0; i < abar.rows(); ++i) {
-        abar(i, 0) = evectors(i, idx).real();
-    }
-    abar.normalize();
     double trace = 0;
     for (int i = 0; i < C.rows(); ++i) {
         trace += C(i, i);
     }
     double phi = acos((trace - 1) / 2);
+
+    if (T(0, 1) > 0)
+        phi *= -1;
+
     return phi;
 }
 
@@ -69,7 +64,6 @@ int main(int argc, char *argv[]) {
 
     bool interp = node["interp"].as<bool>();
     float zq = node["zq"].as<float>();
-    int max_points = node["max_points"].as<int>();
     int sigma_gauss = node["sigma_gauss"].as<int>();
     int patch_size = node["patch_size"].as<int>();
     float nndr = node["nndr"].as<float>();
@@ -176,15 +170,7 @@ int main(int argc, char *argv[]) {
         t2prime.resize(good_matches.size());
 
         // Compute the transformation using RANSAC
-        Ransac ransac(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
-        srand(i);
-        ransac.computeModel();
-        Eigen::MatrixXd T1;  // T_1_2
-        ransac.getTransform(T1);
-
-        std::vector<int> inliers;
-        ransac.getInliers(T1, inliers);
-        std::cout << "rigid inliers: " << inliers.size() << std::endl;
+        Eigen::MatrixXd T1 = computeAndGetTransform(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
 
         Eigen::MatrixXd p1temp = p1, p2temp = p2;
 
@@ -193,11 +179,8 @@ int main(int argc, char *argv[]) {
         double v2 = gtvec[5];
         removeDoppler(p1, v1, beta);
         removeDoppler(p2, v2, beta);
-        Ransac ransac2(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
         srand(i);
-        ransac2.computeModel();
-        Eigen::MatrixXd T2;  // T_1_2
-        ransac2.getTransform(T2);
+        Eigen::MatrixXd T2 = computeAndGetTransform(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
 
         // Remove motion distortion from the pointclouds (second)
         Eigen::VectorXd wbar1 = Eigen::VectorXd::Zero(6);
@@ -208,31 +191,19 @@ int main(int argc, char *argv[]) {
         wbar2(0) = gtvec[5];
         wbar2(5) = gtvec[6];
         removeMotionDistortion(p2, t2prime, wbar2, time2);
-        Ransac ransac3(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
-        srand(i);
-        ransac3.computeModel();
-        Eigen::MatrixXd T3;  // T_1_2
-        ransac3.getTransform(T3);
+        Eigen::MatrixXd T3 = computeAndGetTransform(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
 
         // Remove motion distortion (first)
         p1 = p1temp;
         p2 = p2temp;
         removeMotionDistortion(p1, t1prime, wbar1, time1);
         removeMotionDistortion(p2, t1prime, wbar1, time1);
-        Ransac ransac4(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
-        srand(i);
-        ransac4.computeModel();
-        Eigen::MatrixXd T4;  // T_1_2
-        ransac4.getTransform(T4);
+        Eigen::MatrixXd T4 = computeAndGetTransform(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
 
         // Remove Doppler effects (second)
         removeDoppler(p1, v1, beta);
         removeDoppler(p2, v2, beta);
-        Ransac ransac5(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
-        srand(i);
-        ransac5.computeModel();
-        Eigen::MatrixXd T5;  // T_1_2
-        ransac5.getTransform(T5);
+        Eigen::MatrixXd T5 = computeAndGetTransform(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
 
         // Retrieve the ground truth to calculate accuracy
         float yaw = getRotation(T1);
