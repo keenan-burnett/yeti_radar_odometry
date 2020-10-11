@@ -169,5 +169,6 @@ target_link_libraries(test_localization
     association
 	${catkin_LIBRARIES}
 	${OpenCV_LIBRARIES}
-    yaml-cpp
+    ${libpointmatcher_LIBRARIES}
+    # yaml-cpp
 )

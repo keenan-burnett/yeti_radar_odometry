@@ -1,4 +1,4 @@
-#include <yaml-cpp/yaml.h>
+// #include <yaml-cpp/yaml.h>
 #include <iostream>
 #include <string>
 #include <fstream>
@@ -10,12 +10,17 @@
 #include "radar_utils.hpp"
 #include "features.hpp"
 #include "association.hpp"
+#include "pointmatcher/PointMatcher.h"
+// #include "PointMatcher/yaml-cpp-pm/yaml.h"
+
+typedef PointMatcher<double> PM;
+typedef PM::DataPoints DP;
 
 void removeDoppler(Eigen::MatrixXd &p, double v, double beta) {
     for (uint j = 0; j < p.cols(); ++j) {
         double rsq = p(0, j) * p(0, j) + p(1, j) * p(1, j);
-        p(0, j) -= beta * v * p(0, j) * p(0, j) / rsq;
-        p(1, j) -= beta * v * p(0, j) * p(1, j) / rsq;
+        p(0, j) += beta * v * p(0, j) * p(0, j) / rsq;
+        p(1, j) += beta * v * p(0, j) * p(1, j) / rsq;
     }
 }
 
@@ -30,6 +35,7 @@ void removeMotionDistortion(Eigen::MatrixXd &p, std::vector<int64_t> tprime, Eig
     }
 }
 
+// Rigid RANSAC
 Eigen::MatrixXd computeAndGetTransform(Eigen::MatrixXd p2, Eigen::MatrixXd p1, double ransac_threshold,
     double inlier_ratio, int max_iterations){
     Ransac ransac(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
@@ -37,6 +43,40 @@ Eigen::MatrixXd computeAndGetTransform(Eigen::MatrixXd p2, Eigen::MatrixXd p1, d
     Eigen::MatrixXd T;
     ransac.getTransform(T);
     return T;
+}
+
+// ICP
+Eigen::MatrixXd computeAndGetTransform2(Eigen::MatrixXd p2, Eigen::MatrixXd p1, double ransac_threshold,
+    double inlier_ratio, int max_iterations) {
+    Eigen::MatrixXd c1 = Eigen::MatrixXd::Ones(3, p1.cols());
+    Eigen::MatrixXd c2 = Eigen::MatrixXd::Ones(3, p2.cols());
+    c1.block(0, 0, 2, p1.cols()) = p1.block(0, 0, 2, p1.cols());
+    c2.block(0, 0, 2, p2.cols()) = p2.block(0, 0, 2, p1.cols());
+    DP::Labels labels;
+    labels.push_back(DP::Label("x", 1));
+    labels.push_back(DP::Label("y", 1));
+    labels.push_back(DP::Label("w", 1));
+    DP ref(c1, labels);
+    DP data(c2, labels);
+    PM::ICP icp;
+    std::string config = "/home/keenan/radar_ws/src/yeti/yeti/config/icp.yaml";
+    std::ifstream ifs(config.c_str());
+    icp.loadFromYaml(ifs);
+    icp.readingDataPointsFilters = icp.referenceDataPointsFilters;
+    // icp.setDefault();
+    Eigen::Matrix3d prior = Eigen::Matrix3d::Identity();
+    prior.block(0, 0, 2, 2) << -1, 0, 0, -1;
+    std::cout << prior << std::endl;
+    PM::TransformationParameters T = icp(data, ref, prior);
+    Eigen::MatrixXd Tout = T;
+
+    DP data_out(data);
+    icp.transformations.apply(data_out, T);
+    ref.save("test_ref.vtk");
+    data.save("test_data_in.vtk");
+    data_out.save("test_data_out.vtk");
+
+    return Tout;
 }
 
 double getRotation(Eigen::MatrixXd T) {
@@ -57,22 +97,20 @@ double getRotation(Eigen::MatrixXd T) {
 
 int main(int argc, char *argv[]) {
     std::string root = "/home/keenan/Documents/data/boreas/2020_10_06";
-    omp_set_num_threads(8);
+    // omp_set_num_threads(8);
     std::string datadir = root + "/radar";
     std::string gt = root + "/radar_groundtruth.csv";
-    YAML::Node node = YAML::LoadFile("/home/keenan/radar_ws/src/yeti/yeti/config/feature_matching.yaml");
+    // YAML::Node node = YAML::LoadFile("/home/keenan/radar_ws/src/yeti/yeti/config/feature_matching.yaml");
 
-    bool interp = node["interp"].as<bool>();
-    float zq = node["zq"].as<float>();
-    int sigma_gauss = node["sigma_gauss"].as<int>();
-    int patch_size = node["patch_size"].as<int>();
-    float nndr = node["nndr"].as<float>();
-    double ransac_threshold = node["threshold"].as<double>();
-    double inlier_ratio = node["inlier_ratio"].as<double>();
-    int max_iterations = node["max_iterations"].as<int>();
-    int max_gn_iterations = node["max_gn_iterations"].as<int>();
-    double md_threshold = node["md_threshold"].as<double>();
-    double beta = node["beta"].as<double>();
+    bool interp = true;
+    float zq = 3.0;
+    int sigma_gauss = 17;
+    int patch_size = 21;
+    float nndr = 0.99;
+    double ransac_threshold = 0.75;
+    double inlier_ratio = 0.90;
+    int max_iterations = 1000;
+    double beta = 0.049;
 
     float cart_resolution = 0.2384;
     int cart_pixel_width = 1048;
@@ -85,7 +123,7 @@ int main(int argc, char *argv[]) {
     // File for storing the results of estimation on each frame (and the accuracy)
     std::ofstream ofs;
     ofs.open("localization_accuracy.csv", std::ios::out);
-    ofs << "x,y,yaw,gtx,gty,gtyaw,time1,time2,xmd,ymd,yawmd,xdopp,ydopp,yawdopp,v1,w1,v2,w2,\n";
+    // ofs << "x,y,yaw,gtx,gty,gtyaw,time1,time2,xmd,ymd,yawmd,xdopp,ydopp,yawdopp,v1,w1,v2,w2,\n";
     // Create ORB feature detector
     cv::Ptr<cv::ORB> detector = cv::ORB::create();
     detector->setPatchSize(patch_size);

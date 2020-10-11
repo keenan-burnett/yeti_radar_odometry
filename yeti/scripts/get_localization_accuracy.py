@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import matplotlib
 import numpy as np
 
 def getRotDiff(r1, r2):
@@ -9,7 +10,7 @@ def getRotDiff(r1, r2):
     return abs(r1 - r2)
 
 if __name__ == "__main__":
-    file = "localization_accuracy4.csv"
+    file = "localization_accuracy_icra.csv"
 
     dt1 = []
     dt2 = []
@@ -22,51 +23,58 @@ if __name__ == "__main__":
     dr4 = []
     dr5 = []
 
-    threshold = 15
+    threshold = 10
     rot_hold = 10
 
+    i = 0
     with open(file, 'r') as f:
         f.readline()
         for line in f:
+            i += 1
+            if i > 136:
+                break
             row = line.split(',')
             gtx = float(row[15])
+            gtx *= -1
             gty = float(row[16])
             gtr = np.sqrt(gtx**2 + gty**2)
             gtyaw = float(row[17])
             # if gtyaw < 0:
                 # gtyaw = gtyaw + 2 * np.pi
+            # if gtr > 10:
+                # continue
 
             dt = np.sqrt((gtx - float(row[0]))**2 + (gty - float(row[1]))**2)
             if dt < threshold:
-                dt1.append(dt / gtr)
+                dt1.append(dt)
                 dr = 180 * getRotDiff(gtyaw, float(row[2])) / np.pi
                 if dr < rot_hold:
                     dr1.append(dr)
 
             dt = np.sqrt((gtx - float(row[3]))**2 + (gty - float(row[4]))**2)
             if dt < threshold:
-                dt2.append(dt / gtr)
+                dt2.append(dt)
                 dr = 180 * getRotDiff(gtyaw, float(row[5])) / np.pi
                 if dr < rot_hold:
                     dr2.append(dr)
 
             dt = np.sqrt((gtx - float(row[6]))**2 + (gty - float(row[7]))**2)
             if dt < threshold:
-                dt3.append(dt / gtr)
+                dt3.append(dt)
                 dr = 180 * getRotDiff(gtyaw, float(row[8])) / np.pi
                 if dr < rot_hold:
                     dr3.append(dr)
 
             dt = np.sqrt((gtx - float(row[9]))**2 + (gty - float(row[10]))**2)
             if dt < threshold:
-                dt4.append(dt / gtr)
+                dt4.append(dt)
                 dr = 180 * getRotDiff(gtyaw, float(row[11])) / np.pi
                 if dr < rot_hold:
                     dr4.append(dr)
 
             dt = np.sqrt((gtx - float(row[12]))**2 + (gty - float(row[13]))**2)
             if dt < threshold:
-                dt5.append(dt / gtr)
+                dt5.append(dt)
                 dr = 180 * getRotDiff(gtyaw, float(row[14])) / np.pi
                 if dr < rot_hold:
                     dr5.append(dr)
@@ -88,5 +96,12 @@ if __name__ == "__main__":
     print('MD ONLY: {} sigma_dt: {} dr: {} sigma_dr: {}'.format(np.median(dt4), np.mean((dt4 - np.median(dt4))**2), np.median(dr4), np.mean((dr4 - np.median(dr4))**2)))
     print('MD + DOPP: {} sigma_dt: {} dr: {} sigma_dr: {}'.format(np.median(dt5), np.mean((dt5 - np.median(dt5))**2), np.median(dr5), np.mean((dr5 - np.median(dr5))**2)))
 
-    plt.hist(dt1, 25)
+    matplotlib.rcParams.update({'font.size': 13, 'xtick.labelsize' : 14, 'ytick.labelsize' : 14})
+    plt.figure(figsize=(10, 5))
+    bins = np.arange(0, 9.0, 0.5)
+    plt.hist([dt1, dt4, dt5], bins=bins, label=['RIGID', 'MC', 'MC+Dopp'], color=['b', 'r', 'g'], normed=True)
+    plt.xlabel('Translation Error (m)', fontsize=15)
+    plt.ylabel('Probability', fontsize=15)
+    plt.legend(loc='best')
+    plt.savefig('localization_accuracy.pdf')
     plt.show()

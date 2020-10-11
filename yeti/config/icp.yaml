@@ -27,4 +27,4 @@ inspector:
   NullInspector
 
 logger:
-  NullLogger
+  FileLogger

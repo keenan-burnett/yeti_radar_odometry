@@ -191,11 +191,11 @@ int main(int argc, char *argv[]) {
         ofs << time1 << "," << time2 << "," << Tmd(0, 3) << "," << Tmd(1, 3) << "," <<  yaw2 << ",";
         ofs << Tmd2(0, 3) << "," << Tmd2(1, 3) << "," << yaw3 << "\n";
 
-        // cv::Mat img_matches;
-        // cv::drawMatches(img1, kp1, img2, kp2, good_matches, img_matches, cv::Scalar::all(-1),
-        //          cv::Scalar::all(-1), std::vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
-        // cv::imshow("good", img_matches);
-        // cv::waitKey(0);
+        cv::Mat img_matches;
+        cv::drawMatches(img1, kp1, img2, kp2, good_matches, img_matches, cv::Scalar::all(-1),
+                 cv::Scalar::all(-1), std::vector<char>(), cv::DrawMatchesFlags::NOT_DRAW_SINGLE_POINTS);
+        cv::imshow("good", img_matches);
+        cv::waitKey(0);
     }
 
     return 0;

@@ -137,15 +137,15 @@ def saveErrorPlots(errlist, filename):
             axs[1, 0].plot(vx[:m], t_vel_err, 'ob-', label='RIGID')
             axs[1, 1].plot(vx[:m], r_vel_err, 'ob-', label='RIGID')
         if j == 1:
-            axs[0, 0].plot(lengths[:l], t_len_err, 'Dr-', label='MDRANSAC')
-            axs[0, 1].plot(lengths[:l], r_len_err, 'Dr-', label='MDRANSAC')
-            axs[1, 0].plot(vx[:m], t_vel_err, 'Dr-', label='MDRANSAC')
-            axs[1, 1].plot(vx[:m], r_vel_err, 'Dr-', label='MDRANSAC')
+            axs[0, 0].plot(lengths[:l], t_len_err, 'Dr-', label='MCRANSAC')
+            axs[0, 1].plot(lengths[:l], r_len_err, 'Dr-', label='MCRANSAC')
+            axs[1, 0].plot(vx[:m], t_vel_err, 'Dr-', label='MCRANSAC')
+            axs[1, 1].plot(vx[:m], r_vel_err, 'Dr-', label='MCRANSAC')
         if j == 2:
-            axs[0, 0].plot(lengths[:l], t_len_err, 'og-', label='DOPPLER')
-            axs[0, 1].plot(lengths[:l], r_len_err, 'og-', label='DOPPLER')
-            axs[1, 0].plot(vx[:m], t_vel_err, 'og-', label='DOPPLER')
-            axs[1, 1].plot(vx[:m], r_vel_err, 'og-', label='DOPPLER')
+            axs[0, 0].plot(lengths[:l], t_len_err, 'og-', label='MC+DOPP')
+            axs[0, 1].plot(lengths[:l], r_len_err, 'og-', label='MC+DOPP')
+            axs[1, 0].plot(vx[:m], t_vel_err, 'og-', label='MC+DOPP')
+            axs[1, 1].plot(vx[:m], r_vel_err, 'og-', label='MC+DOPP')
 
     axLine, axLabel = axs[0, 0].get_legend_handles_labels()
 
@@ -180,69 +180,72 @@ if __name__ == '__main__':
     err_md = []
     err_dopp = []
 
-    for file in files:
-	print(file)
-        T_gt = np.identity(3)
-        T_res = np.identity(3)
-        T_md = np.identity(3)
-        T_dopp = np.identity(3)
-        poses_gt = []
-        poses_res = []
-        poses_md = []
-        poses_dopp = []
-        with open(file) as f:
-            reader = csv.reader(f, delimiter=',')
-            i = 0
-            for row in reader:
-                if i == 0:
-                    i = 1
-                    continue
-                # Create transformation matrices
-                T_gt_ = get_transform(float(row[3]), float(row[4]), float(row[5]))
-                T_res_ = get_transform(float(row[0]), float(row[1]), float(row[2]))
-                T_md_ = get_transform(float(row[8]), float(row[9]), float(row[10]))
-                T_dopp_ = get_transform(float(row[11]), float(row[12]), float(row[13]))
-                T_gt = np.matmul(T_gt, T_gt_)
-                T_res = np.matmul(T_res, T_res_)
-                T_md = np.matmul(T_md, T_md_)
-                T_dopp = np.matmul(T_dopp, T_dopp_)
+    # for file in files:
+	# print(file)
+    #     T_gt = np.identity(3)
+    #     T_res = np.identity(3)
+    #     T_md = np.identity(3)
+    #     T_dopp = np.identity(3)
+    #     poses_gt = []
+    #     poses_res = []
+    #     poses_md = []
+    #     poses_dopp = []
+    #     with open(file) as f:
+    #         reader = csv.reader(f, delimiter=',')
+    #         i = 0
+    #         for row in reader:
+    #             if i == 0:
+    #                 i = 1
+    #                 continue
+    #             # Create transformation matrices
+    #             T_gt_ = get_transform(float(row[3]), float(row[4]), float(row[5]))
+    #             T_res_ = get_transform(float(row[0]), float(row[1]), float(row[2]))
+    #             T_md_ = get_transform(float(row[8]), float(row[9]), float(row[10]))
+    #             T_dopp_ = get_transform(float(row[11]), float(row[12]), float(row[13]))
+    #             T_gt = np.matmul(T_gt, T_gt_)
+    #             T_res = np.matmul(T_res, T_res_)
+    #             T_md = np.matmul(T_md, T_md_)
+    #             T_dopp = np.matmul(T_dopp, T_dopp_)
+    #
+    #             R_gt = T_gt[0:2,0:2]
+    #             R_res = T_res[0:2,0:2]
+    #             R_md = T_md[0:2,0:2]
+    #             R_dopp = T_dopp[0:2,0:2]
+    #             if np.linalg.det(R_gt) != 1.0:
+    #                 enforce_orthogonality(R_gt)
+    #                 T_gt[0:2,0:2] = R_gt
+    #             if np.linalg.det(R_res) != 1.0:
+    #                 enforce_orthogonality(R_res)
+    #                 T_res[0:2,0:2] = R_res
+    #             if np.linalg.det(R_md) != 1.0:
+    #                 enforce_orthogonality(R_md)
+    #                 T_md[0:2,0:2] = R_md
+    #             if np.linalg.det(R_dopp) != 1.0:
+    #                 enforce_orthogonality(R_dopp)
+    #                 T_dopp[0:2,0:2] = R_dopp
+    #
+    #             poses_gt.append(T_gt)
+    #             poses_res.append(T_res)
+    #             poses_md.append(T_md)
+    #             poses_dopp.append(T_dopp)
+    #
+    #     err_rigid.extend(calcSequenceErrors(poses_gt, poses_res))
+    #     err_md.extend(calcSequenceErrors(poses_gt, poses_md))
+    #     err_dopp.extend(calcSequenceErrors(poses_gt, poses_dopp))
 
-                R_gt = T_gt[0:2,0:2]
-                R_res = T_res[0:2,0:2]
-                R_md = T_md[0:2,0:2]
-                R_dopp = T_dopp[0:2,0:2]
-                if np.linalg.det(R_gt) != 1.0:
-                    enforce_orthogonality(R_gt)
-                    T_gt[0:2,0:2] = R_gt
-                if np.linalg.det(R_res) != 1.0:
-                    enforce_orthogonality(R_res)
-                    T_res[0:2,0:2] = R_res
-                if np.linalg.det(R_md) != 1.0:
-                    enforce_orthogonality(R_md)
-                    T_md[0:2,0:2] = R_md
-                if np.linalg.det(R_dopp) != 1.0:
-                    enforce_orthogonality(R_dopp)
-                    T_dopp[0:2,0:2] = R_dopp
-
-                poses_gt.append(T_gt)
-                poses_res.append(T_res)
-                poses_md.append(T_md)
-                poses_dopp.append(T_dopp)
-
-        err_rigid.extend(calcSequenceErrors(poses_gt, poses_res))
-        err_md.extend(calcSequenceErrors(poses_gt, poses_md))
-        err_dopp.extend(calcSequenceErrors(poses_gt, poses_dopp))
-
-    saveSequenceErrors(err_rigid, 'pose_error_rigid.csv')
-    saveSequenceErrors(err_md, 'pose_error_mdransac.csv')
-    saveSequenceErrors(err_dopp, 'pose_error_dopp.csv')
-    saveErrorPlots([err_rigid, err_md, err_dopp], 'pose_error.png')
+    # saveSequenceErrors(err_rigid, 'pose_error_rigid.csv')
+    # saveSequenceErrors(err_md, 'pose_error_mdransac.csv')
+    # saveSequenceErrors(err_dopp, 'pose_error_dopp.csv')
+    err_rigid = loadSequenceErrors('pose_error_rigid_icra.csv')
+    err_md = loadSequenceErrors('pose_error_mdransac_icra.csv')
+    err_dopp = loadSequenceErrors('pose_error_dopp_icra.csv')
+    saveErrorPlots([err_rigid, err_md, err_dopp], 'pose_error.pdf')
     t_err, r_err = getStats(err_rigid)
     print('RIGID:')
     print('t_err: {} %'.format(t_err * 100))
     print('r_err: {} deg/m'.format(r_err * 180 / np.pi))
     t_err, r_err = getStats(err_md)
-    print('MDRANSAC:')
+    print('MCRANSAC:')
     print('t_err: {} %'.format(t_err * 100))
     print('r_err: {} deg/m'.format(r_err * 180 / np.pi))
     t_err, r_err = getStats(err_dopp)
