@@ -240,10 +240,6 @@ int main() {
         cv::line(vis2, cross_points[0], cross_points[1], cv::Scalar(255, 255, 255));
         cv::line(vis2, cross_points[2], cross_points[3], cv::Scalar(255, 255, 255));
         int buffer = 2;
-        cv::ellipse(vis2, cv::Point(280, 177), cv::Size(11 + buffer, 40 + buffer), 0, 0, 360, cv::Scalar(255, 0, 0), 2);
-        cv::ellipse(vis2, cv::Point(270, 316), cv::Size(12 + buffer, 36 + buffer), 0, 0, 360, cv::Scalar(255, 0, 0), 2);
-        cv::ellipse(vis2, cv::Point(274, 384), cv::Size(11 + buffer, 34 + buffer), 0, 0, 360, cv::Scalar(255, 0, 0), 2);
-        cv::ellipse(vis2, cv::Point(256, 449), cv::Size(14 + buffer, 41 + buffer), 0, 0, 360, cv::Scalar(255, 0, 0), 2);
 
         cv::imshow("motion distort removed", vis2);
         cv::waitKey(0);

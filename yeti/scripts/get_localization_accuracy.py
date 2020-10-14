@@ -10,7 +10,7 @@ def getRotDiff(r1, r2):
     return abs(r1 - r2)
 
 if __name__ == "__main__":
-    file = "localization_accuracy_icra.csv"
+    file = "localization_accuracy_icra2.csv"
 
     dt1 = []
     dt2 = []
@@ -31,18 +31,16 @@ if __name__ == "__main__":
         f.readline()
         for line in f:
             i += 1
-            if i > 136:
-                break
             row = line.split(',')
-            gtx = float(row[15])
-            gtx *= -1
-            gty = float(row[16])
+            gtx = float(row[16])
+            gty = float(row[15])
+
+            if gty > 0:
+                gtx *= -1
+                gty *= -1
+
             gtr = np.sqrt(gtx**2 + gty**2)
             gtyaw = float(row[17])
-            # if gtyaw < 0:
-                # gtyaw = gtyaw + 2 * np.pi
-            # if gtr > 10:
-                # continue
 
             dt = np.sqrt((gtx - float(row[0]))**2 + (gty - float(row[1]))**2)
             if dt < threshold:
@@ -96,13 +94,13 @@ if __name__ == "__main__":
     print('MD ONLY: {} sigma_dt: {} dr: {} sigma_dr: {}'.format(np.median(dt4), np.mean((dt4 - np.median(dt4))**2), np.median(dr4), np.mean((dr4 - np.median(dr4))**2)))
     print('MD + DOPP: {} sigma_dt: {} dr: {} sigma_dr: {}'.format(np.median(dt5), np.mean((dt5 - np.median(dt5))**2), np.median(dr5), np.mean((dr5 - np.median(dr5))**2)))
 
-    matplotlib.rcParams.update({"font.size" : 15, 'xtick.labelsize' : 15, 'ytick.labelsize' : 15})
+    matplotlib.rcParams.update({"font.size" : 16, 'xtick.labelsize' : 16, 'ytick.labelsize' : 16, 'axes.linewidth' : 1.5})
     plt.figure(figsize=(10, 5.5))
     bins = np.arange(0, 9.0, 0.5)
     plt.grid(which='both', linestyle='--', alpha=0.5, axis='y')
-    plt.hist([dt1, dt4, dt3], bins=bins, label=['RIGID', 'MC', 'MC+Dopp'], color=['r', 'b', 'g'], normed=True)
-    plt.xlabel('Translation Error (m)', fontsize=17)
-    plt.ylabel('Probability', fontsize=17)
+    plt.hist([dt1, dt4, dt3], bins=bins, label=['RIGID', 'MC', 'MC+Dopp'], color=['r', 'b', 'limegreen'], rwidth=0.6)
+    plt.xlabel('Translation Error (m)', fontsize=18)
+    plt.ylabel('Number of Radar Pairs', fontsize=18)
     plt.legend(loc='best')
-    plt.savefig('localization_accuracy.pdf')
-    plt.show()
+    plt.savefig('localization_accuracy.pdf', bbox_inches='tight', pad_inches=0.0)
+    # plt.show()

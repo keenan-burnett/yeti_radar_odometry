@@ -172,3 +172,12 @@ target_link_libraries(test_localization
     ${libpointmatcher_LIBRARIES}
     # yaml-cpp
 )
+
+add_executable(lidar_loc_gt src/lidar_loc_gt.cpp)
+target_link_libraries(lidar_loc_gt
+    features
+    radar_utils
+	${catkin_LIBRARIES}
+	${OpenCV_LIBRARIES}
+    ${libpointmatcher_LIBRARIES}
+)

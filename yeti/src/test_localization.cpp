@@ -1,4 +1,3 @@
-// #include <yaml-cpp/yaml.h>
 #include <iostream>
 #include <string>
 #include <fstream>
@@ -11,7 +10,6 @@
 #include "features.hpp"
 #include "association.hpp"
 #include "pointmatcher/PointMatcher.h"
-// #include "PointMatcher/yaml-cpp-pm/yaml.h"
 
 typedef PointMatcher<double> PM;
 typedef PM::DataPoints DP;
@@ -208,6 +206,7 @@ int main(int argc, char *argv[]) {
         t2prime.resize(good_matches.size());
 
         // Compute the transformation using RANSAC
+        srand(i);
         Eigen::MatrixXd T1 = computeAndGetTransform(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
 
         Eigen::MatrixXd p1temp = p1, p2temp = p2;
@@ -229,6 +228,7 @@ int main(int argc, char *argv[]) {
         wbar2(0) = gtvec[5];
         wbar2(5) = gtvec[6];
         removeMotionDistortion(p2, t2prime, wbar2, time2);
+        srand(i);
         Eigen::MatrixXd T3 = computeAndGetTransform(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
 
         // Remove motion distortion (first)
@@ -236,11 +236,13 @@ int main(int argc, char *argv[]) {
         p2 = p2temp;
         removeMotionDistortion(p1, t1prime, wbar1, time1);
         removeMotionDistortion(p2, t1prime, wbar1, time1);
+        srand(i);
         Eigen::MatrixXd T4 = computeAndGetTransform(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
 
         // Remove Doppler effects (second)
         removeDoppler(p1, v1, beta);
         removeDoppler(p2, v2, beta);
+        srand(i);
         Eigen::MatrixXd T5 = computeAndGetTransform(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
 
         // Retrieve the ground truth to calculate accuracy

@@ -63,10 +63,10 @@ def get_groundtruth(rostime, synch_parameters, gtlines, gt_times):
     return [rostime, x, y, theta, v, w]
 
 def get_transform(x, y, theta):
-    R = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
-    if np.linalg.det(R) != 1.0:
-        enforce_orthogonality(R)
-    T = np.identity(3)
+    R = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]], dtype=np.float64)
+    # if np.linalg.det(R) != 1.0:
+        # enforce_orthogonality(R)
+    T = np.identity(3, dtype=np.float64)
     T[0:2, 0:2] = R
     T[0, 2] = x
     T[1, 2] = y
@@ -75,6 +75,8 @@ def get_transform(x, y, theta):
 
 # Goal: csv file with fname1, fname2, x, y, theta, v1, w1, v2, w2
 # v1 and v2 >= 14
+
+T_navtech = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1]])
 
 if __name__ == '__main__':
 
@@ -135,7 +137,7 @@ if __name__ == '__main__':
     outfile = project + '/radar_groundtruth.csv'
     f = open(outfile, 'w')
 
-    minvel = 12.0
+    minvel = 10.0
     for gt in groundtruth1:
         v = gt[4]
         if v < minvel:
@@ -146,7 +148,7 @@ if __name__ == '__main__':
         theta = gt[3]
         w = gt[5]
 
-        mind = 25.0
+        mind = 10.0
         closest = -1
         for i in range(0, len(groundtruth2)):
             gt2 = groundtruth2[i]
@@ -161,8 +163,8 @@ if __name__ == '__main__':
                 closest = i
 
         if closest >= 0:
-
             T_i_r1 = get_transform(x, y, theta)
+            T_i_r1 = np.matmul(T_i_r1, T_navtech)
 
             time2 = groundtruth2[closest][0]
             x2 = groundtruth2[closest][1]
@@ -172,6 +174,7 @@ if __name__ == '__main__':
             w2 = groundtruth2[closest][5]
 
             T_i_r2 = get_transform(x2, y2, theta2)
+            T_i_r2 = np.matmul(T_i_r2, T_navtech)
 
             T_r1_r2 = np.matmul(get_inverse_tf(T_i_r1), T_i_r2)
 
