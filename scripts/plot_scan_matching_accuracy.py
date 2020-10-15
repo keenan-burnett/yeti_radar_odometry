@@ -376,7 +376,7 @@ if __name__ == '__main__':
     plt.axes().set_aspect('equal')
     plt.plot(xgt, ygt, 'k', linewidth=2.5, label='Ground Truth')
     plt.plot(xrigid, yrigid, 'r', linewidth=2.5, label='RIGID')
-    plt.plot(xmd, ymd, 'b', linewidth=2.5, label='MCRANSAC')
+    plt.plot(xmd, ymd, 'b', linewidth=2.5, label='MC-RANSAC')
     # ax.plot(xgps, ygps, 'g', linewidth=2, label='GPS')
     # ax.set_title('Ground Truth vs. Radar Odometry')
     plt.xlabel('x (m)', fontsize=16)

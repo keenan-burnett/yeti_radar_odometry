@@ -138,10 +138,10 @@ def saveErrorPlots(errlist, filename):
             axs[1, 0].plot(vx[:m], t_vel_err, 'ob-', label='RIGID', linewidth=2.0)
             axs[1, 1].plot(vx[:m], r_vel_err, 'ob-', label='RIGID', linewidth=2.0)
         if j == 1:
-            axs[0, 0].plot(lengths[:l], t_len_err, 'Dr-', label='MCRANSAC', linewidth=2.0)
-            axs[0, 1].plot(lengths[:l], r_len_err, 'Dr-', label='MCRANSAC', linewidth=2.0)
-            axs[1, 0].plot(vx[:m], t_vel_err, 'Dr-', label='MCRANSAC', linewidth=2.0)
-            axs[1, 1].plot(vx[:m], r_vel_err, 'Dr-', label='MCRANSAC', linewidth=2.0)
+            axs[0, 0].plot(lengths[:l], t_len_err, 'Dr-', label='MC-RANSAC', linewidth=2.0)
+            axs[0, 1].plot(lengths[:l], r_len_err, 'Dr-', label='MC-RANSAC', linewidth=2.0)
+            axs[1, 0].plot(vx[:m], t_vel_err, 'Dr-', label='MC-RANSAC', linewidth=2.0)
+            axs[1, 1].plot(vx[:m], r_vel_err, 'Dr-', label='MC-RANSAC', linewidth=2.0)
         if j == 2:
             axs[0, 0].plot(lengths[:l], t_len_err, 'og-', label='MC+DOPP', linewidth=2.0)
             axs[0, 1].plot(lengths[:l], r_len_err, 'og-', label='MC+DOPP', linewidth=2.0)
@@ -170,17 +170,28 @@ if __name__ == '__main__':
     #     afile = sys.argv[1]
     # print(afile)
 
-    # ff = os.listdir('.')
+    # dontinclude = ['accuracy2019-01-10-14-36-48-radar-oxford-10k-partial',
+    #     'accuracy2019-01-10-11-46-21-radar-oxford-10k',
+    #     'accuracy2019-01-16-14-15-33-radar-oxford-10k']
+
+    # folder = './icra_odom/'
+    # ff = os.listdir('./icra_odom/')
     # files = []
     # for f in ff:
     #     if 'accuracy' in f:
-    #         files.append(f)
+    #         bad = False
+    #         for dont in dontinclude:
+    #             if dont in f:
+    #                 bad = True
+    #         if not bad:
+    #             files.append(folder + f)
+
     files = ['accuracy.csv']
 
-    err_rigid = []
-    err_md = []
-    err_dopp = []
-
+    # err_rigid = []
+    # err_md = []
+    # err_dopp = []
+    #
     # for file in files:
 	# print(file)
     #     T_gt = np.identity(3)
@@ -237,16 +248,16 @@ if __name__ == '__main__':
     # saveSequenceErrors(err_rigid, 'pose_error_rigid.csv')
     # saveSequenceErrors(err_md, 'pose_error_mdransac.csv')
     # saveSequenceErrors(err_dopp, 'pose_error_dopp.csv')
-    err_rigid = loadSequenceErrors('pose_error_rigid_icra.csv')
-    err_md = loadSequenceErrors('pose_error_mdransac_icra.csv')
-    err_dopp = loadSequenceErrors('pose_error_dopp_icra.csv')
+    err_rigid = loadSequenceErrors('pose_error_rigid_icra2.csv')
+    err_md = loadSequenceErrors('pose_error_mdransac_icra2.csv')
+    err_dopp = loadSequenceErrors('pose_error_dopp_icra2.csv')
     saveErrorPlots([err_rigid, err_md, err_dopp], 'pose_error.pdf')
     t_err, r_err = getStats(err_rigid)
     print('RIGID:')
     print('t_err: {} %'.format(t_err * 100))
     print('r_err: {} deg/m'.format(r_err * 180 / np.pi))
     t_err, r_err = getStats(err_md)
-    print('MCRANSAC:')
+    print('MC-RANSAC:')
     print('t_err: {} %'.format(t_err * 100))
     print('r_err: {} deg/m'.format(r_err * 180 / np.pi))
     t_err, r_err = getStats(err_dopp)
