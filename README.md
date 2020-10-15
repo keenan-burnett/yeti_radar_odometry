@@ -1,5 +1,15 @@
 # yeti
 
+This repo contains radar odometry code which removes motion distortion and Doppler effects from Navtech radar data. For our odometry experiments, we use the [Oxford Radar Robotcar Dataset](https://oxford-robotics-institute.github.io/radar-robotcar-dataset/). For our metric localization experiments, we use data taken using our own platform, Boreas, shown below.
+
+## Boreas
+![Boreas](figs/boreas.JPG "Boreas")
+
+## Odometry Performance
+![Odom](figs/trajectory.png "Odom")
+
+## Build Instructions
+
 Dependencies:
 
 ```
@@ -13,7 +23,9 @@ yaml-cpp
 steam
 ```
 
-These build instructions assume your building your project using a catkin workspace with catkin build.
+Note: we provide a Dockerfile which can be used to build a docker image with all the required deps already installed.
+
+These build instructions assume you are building your project using a catkin workspace with catkin build.
 
 Note: Eigen and OpenCV can be installed with ROS through ros-kinetic-eigen and ros-kinetic-opencv
 Just remember to add "source /opt/ros/kinetic/setup.bash" to your .bashrc

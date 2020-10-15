@@ -34,7 +34,7 @@ RUN apt-get install -y \
 
 RUN echo "source /opt/ros/kinetic/setup.bash" >> ~/.bashrc
 
-env GIT_TOKEN 2bdb759fd1a964a0d14387599d7e57cbad75e7d3
+env GIT_TOKEN # replace this your own git token!
 
 RUN git clone https://$GIT_TOKEN@github.com/ethz-asl/libnabo.git
 RUN cd libnabo && mkdir build && cd build && cmake .. && make -j32 && make install
@@ -56,5 +56,3 @@ RUN mkdir catkin_ws && cd catkin_ws && mkdir src && cd src && \
     git clone https://$GIT_TOKEN@github.com/keenan-burnett/yeti.git && \
     cd .. && catkin config --extend /steam_ws/devel/repo && \
     catkin build
-
-
