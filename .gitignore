@@ -1,2 +1,2 @@
 *.pyc
-yeti/third_party/yaml-cpp/
+third_party/yaml-cpp/
