@@ -439,7 +439,6 @@ void MotionDistortedRansac::getTransform(double delta_t, Eigen::MatrixXd &Tf) {
 }
 
 double MotionDistortedRansac::computeModel() {
-    auto start = std::chrono::high_resolution_clock::now();
     int max_inliers = 0;
     int subset_size = 2;
     int i = 0;
@@ -459,10 +458,5 @@ double MotionDistortedRansac::computeModel() {
     std::vector<int> best_inliers;
     getInliers(w_best, best_inliers);
     get_motion_parameters(best_inliers, w_best);
-    auto stop = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> e = stop - start;
-    // std::cout << "MDRANSAC runtime: " << e.count() << std::endl;
-    // std::cout << "MDRANSAC iterations: " << i << std::endl;
-    // std::cout << "MDRANSAC inlier ratio: " << double(best_inliers.size()) / double(p1bar.cols()) << std::endl;
     return double(best_inliers.size()) / double(p1bar.cols());
 }

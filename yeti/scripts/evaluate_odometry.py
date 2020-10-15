@@ -82,15 +82,16 @@ def loadSequenceErrors(file_name):
     return err
 
 def saveErrorPlots(errlist, filename):
-    matplotlib.rcParams.update({'font.size': 12})
+    matplotlib.rcParams.update({'font.size': 13, 'xtick.labelsize' : 12, 'ytick.labelsize' : 12,
+        'axes.linewidth' : 1.5, 'font.family' : 'serif'})
     fig, axs = plt.subplots(2, 2, tight_layout=True)
-    axs[0, 0].set_title('Trans. Error (%) vs. Length (m)')
+    axs[0, 0].set_title('T. Err (%) vs. Length (m)')
     axs[0, 0].grid(which='both', linestyle='--', alpha=0.5)
-    axs[0, 1].set_title('Rot. Error (deg/m) vs. Length (m)')
+    axs[0, 1].set_title('R. Err (deg/m) vs. Length (m)')
     axs[0, 1].grid(which='both', linestyle='--', alpha=0.5)
-    axs[1, 0].set_title('Trans. Error (%) vs. Speed (m/s)')
+    axs[1, 0].set_title('T. Err (%) vs. Speed (m/s)')
     axs[1, 0].grid(which='both', linestyle='--', alpha=0.5)
-    axs[1, 1].set_title('Rot. Error (deg/m) vs. Speed (m/s)')
+    axs[1, 1].set_title('R. Err (deg/m) vs. Speed (m/s)')
     axs[1, 1].grid(which='both', linestyle='--', alpha=0.5)
 
     for j in range(0, len(errlist)):
@@ -132,25 +133,25 @@ def saveErrorPlots(errlist, filename):
         l = len(t_len_err)
         m = len(t_vel_err)
         if j == 0:
-            axs[0, 0].plot(lengths[:l], t_len_err, 'ob-', label='RIGID')
-            axs[0, 1].plot(lengths[:l], r_len_err, 'ob-', label='RIGID')
-            axs[1, 0].plot(vx[:m], t_vel_err, 'ob-', label='RIGID')
-            axs[1, 1].plot(vx[:m], r_vel_err, 'ob-', label='RIGID')
+            axs[0, 0].plot(lengths[:l], t_len_err, 'ob-', label='RIGID', linewidth=2.0)
+            axs[0, 1].plot(lengths[:l], r_len_err, 'ob-', label='RIGID', linewidth=2.0)
+            axs[1, 0].plot(vx[:m], t_vel_err, 'ob-', label='RIGID', linewidth=2.0)
+            axs[1, 1].plot(vx[:m], r_vel_err, 'ob-', label='RIGID', linewidth=2.0)
         if j == 1:
-            axs[0, 0].plot(lengths[:l], t_len_err, 'Dr-', label='MCRANSAC')
-            axs[0, 1].plot(lengths[:l], r_len_err, 'Dr-', label='MCRANSAC')
-            axs[1, 0].plot(vx[:m], t_vel_err, 'Dr-', label='MCRANSAC')
-            axs[1, 1].plot(vx[:m], r_vel_err, 'Dr-', label='MCRANSAC')
+            axs[0, 0].plot(lengths[:l], t_len_err, 'Dr-', label='MCRANSAC', linewidth=2.0)
+            axs[0, 1].plot(lengths[:l], r_len_err, 'Dr-', label='MCRANSAC', linewidth=2.0)
+            axs[1, 0].plot(vx[:m], t_vel_err, 'Dr-', label='MCRANSAC', linewidth=2.0)
+            axs[1, 1].plot(vx[:m], r_vel_err, 'Dr-', label='MCRANSAC', linewidth=2.0)
         if j == 2:
-            axs[0, 0].plot(lengths[:l], t_len_err, 'og-', label='MC+DOPP')
-            axs[0, 1].plot(lengths[:l], r_len_err, 'og-', label='MC+DOPP')
-            axs[1, 0].plot(vx[:m], t_vel_err, 'og-', label='MC+DOPP')
-            axs[1, 1].plot(vx[:m], r_vel_err, 'og-', label='MC+DOPP')
+            axs[0, 0].plot(lengths[:l], t_len_err, 'og-', label='MC+DOPP', linewidth=2.0)
+            axs[0, 1].plot(lengths[:l], r_len_err, 'og-', label='MC+DOPP', linewidth=2.0)
+            axs[1, 0].plot(vx[:m], t_vel_err, 'og-', label='MC+DOPP', linewidth=2.0)
+            axs[1, 1].plot(vx[:m], r_vel_err, 'og-', label='MC+DOPP', linewidth=2.0)
 
     axLine, axLabel = axs[0, 0].get_legend_handles_labels()
 
-    fig.legend(axLine, axLabel, loc = 'upper right', bbox_to_anchor=(0.94, 0.94), fontsize='small')
-    plt.savefig(filename)
+    fig.legend(axLine, axLabel, loc = 'upper right', bbox_to_anchor=(0.925, 0.91), fontsize='small')
+    plt.savefig(filename, bbox_inches='tight', pad_inches=0.0)
 
 
 def getStats(err):

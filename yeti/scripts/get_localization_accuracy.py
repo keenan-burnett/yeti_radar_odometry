@@ -10,7 +10,7 @@ def getRotDiff(r1, r2):
     return abs(r1 - r2)
 
 if __name__ == "__main__":
-    file = "localization_accuracy_icra2.csv"
+    file = "localization_accuracy_icra3.csv"
 
     dt1 = []
     dt2 = []
@@ -94,7 +94,8 @@ if __name__ == "__main__":
     print('MD ONLY: {} sigma_dt: {} dr: {} sigma_dr: {}'.format(np.median(dt4), np.mean((dt4 - np.median(dt4))**2), np.median(dr4), np.mean((dr4 - np.median(dr4))**2)))
     print('MD + DOPP: {} sigma_dt: {} dr: {} sigma_dr: {}'.format(np.median(dt5), np.mean((dt5 - np.median(dt5))**2), np.median(dr5), np.mean((dr5 - np.median(dr5))**2)))
 
-    matplotlib.rcParams.update({"font.size" : 16, 'xtick.labelsize' : 16, 'ytick.labelsize' : 16, 'axes.linewidth' : 1.5})
+    matplotlib.rcParams.update({"font.size" : 16, 'xtick.labelsize' : 16, 'ytick.labelsize' : 16,
+                                'axes.linewidth' : 1.5, 'font.family' : 'serif'})
     plt.figure(figsize=(10, 5.5))
     bins = np.arange(0, 9.0, 0.5)
     plt.grid(which='both', linestyle='--', alpha=0.5, axis='y')

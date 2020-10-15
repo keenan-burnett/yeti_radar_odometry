@@ -40,7 +40,7 @@ void cfar1d(cv::Mat fft_data, int window_size, float scale, int guard_cells, int
     std::cout << "feature extraction: " << e.count() << std::endl;
 }
 
-// Runtime: 0.038s
+// Runtime: 0.035s
 double cen2018features(cv::Mat fft_data, float zq, int sigma_gauss, int min_range, Eigen::MatrixXd &targets) {
     auto t1 = std::chrono::high_resolution_clock::now();
 
@@ -402,6 +402,5 @@ double cen2019descriptors(std::vector<double> azimuths, cv::Size polar_dims, Eig
 
     auto t2 = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> e = t2 - t1;
-    std::cout << e.count() << std::endl;
     return e.count();
 }

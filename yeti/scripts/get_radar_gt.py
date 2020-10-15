@@ -85,7 +85,7 @@ if __name__ == '__main__':
     radar_files.sort()
 
     timefile = project + '/ros_and_gps_time.csv'
-    gtfile = project + '/applanix_post_process_gps.csv'
+    gtfile = project + '/applanix_post_process_gps_icra.csv'
 
     # Synchronize ROS time and GPS time
     deltas = []
@@ -112,20 +112,20 @@ if __name__ == '__main__':
     for line in gtlines:
         gt_times.append(float(line.split(',')[0]))
 
-    # groundtruth1 = []
-    # groundtruth2 = []
-    # for file in radar_files:
-    #     timestamp = int(file.split('.')[0])
-    #     timestamp /= 1.0e9
-    #     print(timestamp)
-    #     if timestamp < 1602033998:
-    #         gt = get_groundtruth(timestamp, p, gtlines, gt_times)
-    #         gt[0] = int(file.split('.')[0])
-    #         groundtruth1.append(gt)
-    #     elif timestamp > 1602034049:
-    #         gt = get_groundtruth(timestamp, p, gtlines, gt_times)
-    #         gt[0] = int(file.split('.')[0])
-    #         groundtruth2.append(gt)
+    groundtruth1 = []
+    groundtruth2 = []
+    for file in radar_files:
+        timestamp = int(file.split('.')[0])
+        timestamp /= 1.0e9
+        print(timestamp)
+        if timestamp < 1602033998:
+            gt = get_groundtruth(timestamp, p, gtlines, gt_times)
+            gt[0] = int(file.split('.')[0])
+            groundtruth1.append(gt)
+        elif timestamp > 1602034049:
+            gt = get_groundtruth(timestamp, p, gtlines, gt_times)
+            gt[0] = int(file.split('.')[0])
+            groundtruth2.append(gt)
 
     g1 = open(project + '/gt1', 'r')
     g2 = open(project + '/gt2', 'r')

@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
     std::string root = "/home/keenan/Documents/data/boreas/2020_10_06";
     // omp_set_num_threads(8);
     std::string datadir = root + "/radar";
-    std::string gt = root + "/radar_groundtruth.csv";
+    std::string gt = root + "/radar_groundtruth_icra2.csv";
     // YAML::Node node = YAML::LoadFile("/home/keenan/radar_ws/src/yeti/yeti/config/feature_matching.yaml");
 
     bool interp = true;

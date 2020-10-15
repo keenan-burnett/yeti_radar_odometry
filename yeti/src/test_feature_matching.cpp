@@ -46,9 +46,6 @@ int main(int argc, char *argv[]) {
     int keypoint_extraction = node["keypoint_extraction"].as<int>();
     double beta = node["beta"].as<double>();
 
-    float cart_res2 = 0.3456;
-    int cart_width2 = 722;
-
     // Get file names of the radar images
     std::vector<std::string> radar_files;
     get_file_names(datadir, radar_files);
@@ -60,8 +57,8 @@ int main(int argc, char *argv[]) {
     cv::Ptr<cv::ORB> detector = cv::ORB::create();
     detector->setPatchSize(patch_size);
     detector->setEdgeThreshold(patch_size);
-    // BRUTEFORCE_HAMMING for ORB descriptors
-    cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create(cv::DescriptorMatcher::FLANNBASED);
+    // BRUTEFORCE_HAMMING for ORB descriptors FLANNBASED for cen2019 descriptors
+    cv::Ptr<cv::DescriptorMatcher> matcher = cv::DescriptorMatcher::create(cv::DescriptorMatcher::BRUTEFORCE_HAMMING);
 
     cv::Mat img1, img2, desc1, desc2;
     std::vector<cv::KeyPoint> kp1, kp2;
@@ -88,9 +85,9 @@ int main(int argc, char *argv[]) {
             radar_polar_to_cartesian(azimuths, fft_data, radar_resolution, cart_resolution, cart_pixel_width, interp, img2, CV_8UC1);  // NOLINT
             polar_to_cartesian_points(azimuths, times, targets, radar_resolution, cart_targets2, t2);
             convert_to_bev(cart_targets2, cart_resolution, cart_pixel_width, patch_size, kp2, t2);
-            cen2019descriptors(azimuths, cv::Size(fft_data.cols, fft_data.rows), targets, cart_targets2,
-                radar_resolution, cart_res2, cart_width2, desc2);
-            // detector->compute(img2, kp2, desc2);
+            // cen2019descriptors(azimuths, cv::Size(fft_data.cols, fft_data.rows), targets, cart_targets2,
+                // radar_resolution, 0.3456, 722, desc2);
+            detector->compute(img2, kp2, desc2);
         }
         if (keypoint_extraction == 2) {
             detector->detect(img2, kp2);
@@ -102,11 +99,7 @@ int main(int argc, char *argv[]) {
             continue;
         // Match keypoint descriptors
         std::vector<std::vector<cv::DMatch>> knn_matches;
-        auto start = std::chrono::high_resolution_clock::now();
         matcher->knnMatch(desc1, desc2, knn_matches, 2);
-        auto stop = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> e = stop - start;
-        std::cout << "match: " << e.count() << std::endl;
 
         // Filter matches using nearest neighbor distance ratio (Lowe, Szeliski)
         std::vector<cv::DMatch> good_matches;
