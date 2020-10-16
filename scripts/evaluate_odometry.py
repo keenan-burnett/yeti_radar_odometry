@@ -83,7 +83,7 @@ def loadSequenceErrors(file_name):
 
 def saveErrorPlots(errlist, filename):
     matplotlib.rcParams.update({'font.size': 13, 'xtick.labelsize' : 12, 'ytick.labelsize' : 12,
-        'axes.linewidth' : 1.5, 'font.family' : 'serif'})
+        'axes.linewidth' : 1.5, 'font.family' : 'serif', 'pdf.fonttype' : 42})
     fig, axs = plt.subplots(2, 2, tight_layout=True)
     axs[0, 0].set_title('T. Err (%) vs. Length (m)')
     axs[0, 0].grid(which='both', linestyle='--', alpha=0.5)

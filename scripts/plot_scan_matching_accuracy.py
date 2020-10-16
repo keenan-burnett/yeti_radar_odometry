@@ -367,7 +367,7 @@ if __name__ == '__main__':
     ydopp = np.array(ydopp)
 
     matplotlib.rcParams.update({'font.size': 16, 'xtick.labelsize' : 16, 'ytick.labelsize' : 16,
-                                'axes.linewidth' : 1.5, 'font.family' : 'serif'})
+                                'axes.linewidth' : 1.5, 'font.family' : 'serif', 'pdf.fonttype' : 42})
 
     # fig, ax = plt.subplots(tight_layout=True)
     plt.figure(figsize=(10, 5))

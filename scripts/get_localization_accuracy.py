@@ -95,7 +95,7 @@ if __name__ == "__main__":
     print('MD + DOPP: {} sigma_dt: {} dr: {} sigma_dr: {}'.format(np.median(dt5), np.mean((dt5 - np.median(dt5))**2), np.median(dr5), np.mean((dr5 - np.median(dr5))**2)))
 
     matplotlib.rcParams.update({"font.size" : 16, 'xtick.labelsize' : 16, 'ytick.labelsize' : 16,
-                                'axes.linewidth' : 1.5, 'font.family' : 'serif'})
+                                'axes.linewidth' : 1.5, 'font.family' : 'serif', 'pdf.fonttype' : 42})
     plt.figure(figsize=(10, 5.5))
     bins = np.arange(0, 9.0, 0.5)
     plt.grid(which='both', linestyle='--', alpha=0.5, axis='y')
