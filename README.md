@@ -106,10 +106,23 @@ Example usage: (Note that the location of your data and the ground truth csv is 
 ## Libraries
 We have written a few libraries, which may be useful to others:
 
-`association.cpp` This library provides our implementation of rigid RANSAC to estimate the pose between two 2D or 3D pointclouds with noisy correspondences. The library also contains our implementation of motion-compensated RANSAC which provides a method for compensating for Dopler effects.
+`association.cpp` This library provides our implementation of rigid RANSAC to estimate the pose between two 2D or 3D pointclouds with noisy correspondences. The library also contains our implementation of motion-compensated RANSAC which provides a method for compensating for Doppler effects.
 
 `features.cpp` This library contains efficient implementations of Sarah Cen's 2018 and 2019 feature extraction methods.
 
 `radar_utils.cpp` This library provides utilities for working with the Oxford Radar Dataset as well as our own data format. We also provide methods for converting between Polar and Cartesian data representations.
 
-TODO: provide data, link to paper, clean up code.
+If you found this git repository useful in your work, please consider citing our paper which has been submitted to ICRA/RA-L 2021:
+
+[Do We Need to Compensate for Motion Distortion and Doppler Effects in Radar-Based Navigation?](https://arxiv.org/abs/2011.03512)
+
+```
+@article{burnett_icra21,
+    author = {Keenan Burnett, Angela P. Schoellig, Timothy D. Barfoot},
+    title = {Do We Need to Compensate for Motion Distortion and Doppler Effects in Radar-Based Navigation?},
+    year={2020},
+    eprint={2011.03512},
+    archivePrefix={arXiv},
+    primaryClass={cs.RO}
+}
+```
