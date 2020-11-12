@@ -8,6 +8,21 @@ This repo contains radar odometry code which removes motion distortion and Doppl
 ## Odometry Performance
 ![Odom](figs/trajectory.png "Odom")
 
+If you found this git repository useful in your work, please consider citing our paper which has been submitted to ICRA/RA-L 2021:
+
+[Do We Need to Compensate for Motion Distortion and Doppler Effects in Radar-Based Navigation?](https://arxiv.org/abs/2011.03512)
+
+```
+@article{burnett_icra21,
+    author = {Keenan Burnett, Angela P. Schoellig, Timothy D. Barfoot},
+    title = {Do We Need to Compensate for Motion Distortion and Doppler Effects in Radar-Based Navigation?},
+    year={2020},
+    eprint={2011.03512},
+    archivePrefix={arXiv},
+    primaryClass={cs.RO}
+}
+```
+
 ## Build Instructions
 
 Dependencies:
@@ -111,18 +126,3 @@ We have written a few libraries, which may be useful to others:
 `features.cpp` This library contains efficient implementations of Sarah Cen's 2018 and 2019 feature extraction methods.
 
 `radar_utils.cpp` This library provides utilities for working with the Oxford Radar Dataset as well as our own data format. We also provide methods for converting between Polar and Cartesian data representations.
-
-If you found this git repository useful in your work, please consider citing our paper which has been submitted to ICRA/RA-L 2021:
-
-[Do We Need to Compensate for Motion Distortion and Doppler Effects in Radar-Based Navigation?](https://arxiv.org/abs/2011.03512)
-
-```
-@article{burnett_icra21,
-    author = {Keenan Burnett, Angela P. Schoellig, Timothy D. Barfoot},
-    title = {Do We Need to Compensate for Motion Distortion and Doppler Effects in Radar-Based Navigation?},
-    year={2020},
-    eprint={2011.03512},
-    archivePrefix={arXiv},
-    primaryClass={cs.RO}
-}
-```
