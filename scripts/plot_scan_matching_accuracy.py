@@ -4,6 +4,20 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 
+def translationError(pose_error):
+    return np.sqrt(pose_error[0, 2]**2 + pose_error[1, 2]**2)
+
+def get_inverse_tf(T):
+    T2 = np.identity(3)
+    R = T[0:2, 0:2]
+    t = T[0:2, 2]
+    t = np.reshape(t, (2, 1))
+    T2[0:2, 0:2] = R.transpose()
+    t = np.matmul(-1 * R.transpose(), t)
+    T2[0, 2] = t[0]
+    T2[1, 2] = t[1]
+    return T2
+
 def enforce_orthogonality(R):
     epsilon = 0.001
     if abs(R[0, 0] - R[1, 1]) > epsilon or abs(R[1, 0] + R[0, 1]) > epsilon:
@@ -27,6 +41,14 @@ def get_transform(x, y, theta):
     xbar = np.matmul(-R, xbar)
     T[0, 2] = xbar[0]
     T[1, 2] = xbar[1]
+    return T
+
+def get_transform2(x, y, theta):
+    R = np.array([[np.cos(theta), np.sin(theta)], [-np.sin(theta), np.cos(theta)]])
+    T = np.identity(3)
+    T[0:2, 0:2] = R
+    T[0, 2] = x
+    T[1, 2] = y
     return T
 
 def get_ins_transformation(time1, time2, gpsfile):
@@ -278,10 +300,6 @@ if __name__ == '__main__':
     axs[0].plot(omegabins, t_bins, 'or-', label='MDRANSAC', linewidth=2)
     axs[1].plot(omegabins, r_bins, 'or-', label='MDRANSAC', linewidth=2)
 
-    # plt.show()
-
-
-
     # Create plot of the trajectories
     T_gt = np.identity(3)
     T_rigid = np.identity(3)
@@ -300,6 +318,9 @@ if __name__ == '__main__':
     xdopp = []
     ydopp = []
 
+    t_error_rigid = []
+    t_error_md = []
+
     with open(afile) as f:
         reader = csv.reader(f, delimiter=',')
         i = 0
@@ -308,10 +329,10 @@ if __name__ == '__main__':
                 i = 1
                 continue
             # Create transformation matrices
-            T_gt_ = get_transform(float(row[3]), float(row[4]), float(row[5]))
-            T_rigid_ = get_transform(float(row[0]), float(row[1]), float(row[2]))
-            T_md_ = get_transform(float(row[8]), float(row[9]), float(row[10]))
-            T_dopp_ = get_transform(float(row[11]), float(row[12]), float(row[13]))
+            T_gt_ = get_transform2(float(row[3]), float(row[4]), float(row[5]))
+            T_rigid_ = get_transform2(float(row[0]), float(row[1]), float(row[2]))
+            T_md_ = get_transform2(float(row[8]), float(row[9]), float(row[10]))
+            T_dopp_ = get_transform2(float(row[11]), float(row[12]), float(row[13]))
             T_gt = np.matmul(T_gt, T_gt_)
             T_rigid = np.matmul(T_rigid, T_rigid_)
             T_md = np.matmul(T_md, T_md_)
@@ -333,6 +354,11 @@ if __name__ == '__main__':
             if np.linalg.det(R_dopp) != 1.0:
                 enforce_orthogonality(R_dopp)
                 T_dopp[0:2,0:2] = R_dopp
+
+            pose_error = np.matmul(get_inverse_tf(T_rigid), T_gt)
+            t_error_rigid.append(translationError(pose_error))
+            pose_error2 = np.matmul(get_inverse_tf(T_md), T_gt)
+            t_error_md.append(translationError(pose_error2))
 
             # Get GPS ground truth between the frames
             # time1 = int(row[6])
@@ -357,6 +383,13 @@ if __name__ == '__main__':
 
     xgt = np.array(xgt)
     ygt = np.array(ygt)
+    rgt = [0]
+    for i in range(1, xgt.shape[0]):
+        delta_x = xgt[i] - xgt[i - 1]
+        delta_y = ygt[i] - ygt[i - 1]
+        rgt.append(np.sqrt(delta_x **2 + delta_y **2) + rgt[i - 1])
+
+    rgt = np.array(rgt)
     xrigid = np.array(xrigid)
     yrigid = np.array(yrigid)
     xmd = np.array(xmd)
@@ -369,18 +402,24 @@ if __name__ == '__main__':
     matplotlib.rcParams.update({'font.size': 16, 'xtick.labelsize' : 16, 'ytick.labelsize' : 16,
                                 'axes.linewidth' : 1.5, 'font.family' : 'serif', 'pdf.fonttype' : 42})
 
-    # fig, ax = plt.subplots(tight_layout=True)
     plt.figure(figsize=(10, 5))
     plt.grid(which='both', linestyle='--', alpha=0.5)
-    # plt.set_aspect('equal')
     plt.axes().set_aspect('equal')
     plt.plot(xgt, ygt, 'k', linewidth=2.5, label='Ground Truth')
     plt.plot(xrigid, yrigid, 'r', linewidth=2.5, label='RIGID')
     plt.plot(xmd, ymd, 'b', linewidth=2.5, label='MC-RANSAC')
-    # ax.plot(xgps, ygps, 'g', linewidth=2, label='GPS')
-    # ax.set_title('Ground Truth vs. Radar Odometry')
     plt.xlabel('x (m)', fontsize=16)
     plt.ylabel('y (m)', fontsize=16)
-    plt.legend(loc="upper right")
+    plt.legend(loc="upper left")
     plt.savefig('trajectory.pdf', bbox_inches='tight', pad_inches=0.0)
-    # plt.show()
+
+    # plt.figure(figsize=(10, 5))
+    # plt.grid(which='both', linestyle='--', alpha=0.5)
+    # t_error_rigid = np.array(t_error_rigid)
+    # t_error_md = np.array(t_error_md)
+    # plt.plot(rgt, t_error_rigid, 'r', linewidth=2.5, label='BASELINE')
+    # plt.plot(rgt, t_error_md, 'b', linewidth=2.5, label='MOTION\nCOMPENSATED')
+    # plt.xlabel('Distance Traveled (m)', fontsize=16)
+    # plt.ylabel('Error (m)', fontsize=16)
+    # plt.legend(loc="upper left")
+    # plt.savefig('traj_error.pdf', bbox_inches='tight', pad_inches=0.0)

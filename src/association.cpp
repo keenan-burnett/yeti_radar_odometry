@@ -321,11 +321,6 @@ void MotionDistortedRansac::get_motion_parameters(std::vector<int> subset, Eigen
             Eigen::VectorXd gbar = Tbar * p1;
             Eigen::MatrixXd G = delta_ts[subset[m]] * circledot(gbar);
             Eigen::VectorXd ebar = p2 - gbar;
-            // Eigen::MatrixXd H = get_inv_jacobian(gbar);
-            // Eigen::MatrixXd R_cart = H * R_pol * H.transpose();
-            // R_cart = R_cart.inverse();
-            // A += G.transpose() * R_cart * G;
-            // b += G.transpose() * R_cart * ebar;
             A += G.transpose() * G;
             b += G.transpose() * ebar;
         }
@@ -353,7 +348,6 @@ void MotionDistortedRansac::get_motion_parameters(std::vector<int> subset, Eigen
             }
         }
         wbar = wbar + bestAlpha * delta_w;
-        // std::cout << "it: " << it << " error: " << minError << " delta: " << delta_w.squaredNorm() << std::endl;
         if (delta_w.squaredNorm() < epsilon_converge)
             break;
         if (it > 0 && fabs((lastError - minError) / lastError) < error_converge)
@@ -403,8 +397,6 @@ void MotionDistortedRansac::getInliers(Eigen::VectorXd wbar, std::vector<int> &i
             dopplerCorrection(wbar, p1);
             dopplerCorrection(wbar, p2);
         }
-        // Eigen::MatrixXd Tm = se3ToSE3(delta_ts[i] * wbar);
-        // Eigen::VectorXd error = p2 - Tm * p1;
         Eigen::VectorXd error = p2 - transforms[get_closest(delta_ts[i], delta_vec)] * p1;
         if (error.squaredNorm() < tolerance)
             inliers.push_back(i);
@@ -425,8 +417,6 @@ int MotionDistortedRansac::getNumInliers(Eigen::VectorXd wbar) {
             dopplerCorrection(wbar, p1);
             dopplerCorrection(wbar, p2);
         }
-        // Eigen::MatrixXd Tm = se3ToSE3(delta_ts[i] * wbar);
-        // Eigen::VectorXd error = p2 - Tm * p1;
         Eigen::VectorXd error = p2 - transforms[get_closest(delta_ts[i], delta_vec)] * p1;
         if (error.squaredNorm() < tolerance)
             inliers++;

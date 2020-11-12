@@ -219,7 +219,14 @@ private:
     void get_motion_parameters2(Eigen::MatrixXd& p1small, Eigen::MatrixXd& p2small, std::vector<double> delta_t_local,
         Eigen::VectorXd &wbar);
 
+    /*!
+       \brief Retrieve the number of inliers corresponding to body motion vector wbar. (6 x 1)
+    */
     int getNumInliers(Eigen::VectorXd wbar);
 
+    /*!
+       \brief Given a body motion vector wbar (6 x 1), adjust the position of point p to account
+       for the Doppler distortion which may be present in the data.
+    */
     void dopplerCorrection(Eigen::VectorXd wbar, Eigen::VectorXd &p);
 };
