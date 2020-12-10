@@ -7,14 +7,15 @@
 #include "features.hpp"
 
 int main() {
-    std::string datadir = "/home/keenan/Documents/data/2019-01-16-14-15-33-radar-oxford-10k/radar";
-    float cart_resolution = 0.25;
-    int cart_pixel_width = 1000;
+    std::string datadir = "/media/keenan/autorontossd1/2020_11_10/radar";
+    float cart_resolution = 0.2592;
+    int cart_pixel_width = 772;
     bool interpolate_crossover = true;
 
     // Get file names of the radar images
     std::vector<std::string> radar_files;
-    get_file_names(datadir, radar_files);
+    get_file_names(datadir, radar_files, "png");
+    std::cout << radar_files[0] << std::endl;
 
     float radar_resolution = 0.0432;
     std::vector<int64_t> timestamps;
@@ -22,7 +23,17 @@ int main() {
     std::vector<bool> valid;
     cv::Mat fft_data;
 
-    load_radar(datadir + "/" + radar_files[6198], timestamps, azimuths, valid, fft_data);
+    // for (uint i = 0; i < 100; ++i) {
+    //     load_radar(datadir + "/" + radar_files[i], timestamps, azimuths, valid, fft_data);
+    //     cv::Mat cart_img;
+    //     radar_polar_to_cartesian(azimuths, fft_data, radar_resolution, cart_resolution, cart_pixel_width,
+    //         interpolate_crossover, cart_img);
+    //     cart_img.convertTo(cart_img, CV_8UC1, 255.0);
+    //     cv::flip(cart_img, cart_img, 1);
+    //     cv::imwrite(radar_files[i], cart_img);
+    // }
+
+    load_radar(datadir + "/" + radar_files[0], timestamps, azimuths, valid, fft_data);
 
     Eigen::MatrixXd targets;
     int min_range = 58;
@@ -46,8 +57,8 @@ int main() {
     Eigen::MatrixXd cart_targets;
     polar_to_cartesian_points(azimuths, targets, radar_resolution, cart_targets);
     cv::Mat vis;
-    draw_points(cart_img, cart_targets, cart_resolution, cart_pixel_width, vis);
-    cv::imshow("cart", vis);
+    // draw_points(cart_img, cart_targets, cart_resolution, cart_pixel_width, vis);
+    cv::imshow("cart", cart_img);
     cv::waitKey(0);
 
     return 0;

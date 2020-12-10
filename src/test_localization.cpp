@@ -14,17 +14,21 @@
 typedef PointMatcher<double> PM;
 typedef PM::DataPoints DP;
 
-void removeDoppler(Eigen::MatrixXd &p, double v, double beta) {
+void removeDoppler(Eigen::MatrixXd &p, Eigen::Vector3d vbar, double beta) {
     for (uint j = 0; j < p.cols(); ++j) {
-        double rsq = p(0, j) * p(0, j) + p(1, j) * p(1, j);
-        p(0, j) += beta * v * p(0, j) * p(0, j) / rsq;
-        p(1, j) += beta * v * p(0, j) * p(1, j) / rsq;
+        double phi = atan2f(p(1, j), p(0, j));
+        double delta_r = beta * (vbar(0) * cos(phi) + vbar(1) * sin(phi));
+        p(0, j) += delta_r * cos(phi);
+        p(1, j) += delta_r * sin(phi);
+        // double rsq = p(0, j) * p(0, j) + p(1, j) * p(1, j);
+        // p(0, j) += beta * v * p(0, j) * p(0, j) / rsq;
+        // p(1, j) += beta * v * p(0, j) * p(1, j) / rsq;
     }
 }
 
 void removeMotionDistortion(Eigen::MatrixXd &p, std::vector<int64_t> tprime, Eigen::VectorXd wbar, int64_t t_ref) {
     for (uint j = 0; j < p.cols(); ++j) {
-        double delta_t = (tprime[j] - t_ref) / 1000000.0;
+        double delta_t = (tprime[j] - t_ref) / 1.0e6;
         Eigen::MatrixXd T = se3ToSE3(wbar * delta_t);
         Eigen::Vector4d pbar = {p(0, j), p(1, j), 0, 1};
         pbar = T * pbar;
@@ -81,23 +85,37 @@ double getRotation(Eigen::MatrixXd T) {
     Eigen::MatrixXd Cmin = T.block(0, 0, 2, 2);
     Eigen::MatrixXd C = Eigen::MatrixXd::Identity(3, 3);
     C.block(0, 0, 2, 2) = Cmin;
-    double trace = 0;
-    for (int i = 0; i < C.rows(); ++i) {
-        trace += C(i, i);
-    }
-    double phi = acos((trace - 1) / 2);
 
-    if (T(0, 1) > 0)
-        phi *= -1;
+    double eps = 1e-15;
+    int i = 2, j = 1, k = 0;
+    double c_y = sqrt(pow(C(i, i), 2) + pow(C(j, i), 2));
+    double phi = 0;
+    if (c_y > eps) {
+        phi = atan2f(C(k, j), C(k, k));
+    } else {
+        phi = atan2f(-C(j, k), C(j, j));
+    }
+
+    // double trace = 0;
+    // for (int i = 0; i < C.rows(); ++i) {
+    //     trace += C(i, i);
+    // }
+    // double phi = acos((trace - 1) / 2);
+    //
+    // if (T(0, 1) > 0)
+    //     phi *= -1;
 
     return phi;
 }
 
 int main(int argc, char *argv[]) {
-    std::string root = "/home/keenan/Documents/data/boreas/2020_10_06";
+    // std::string root = "/home/keenan/Documents/data/boreas/2020_10_06";
+    std::string root = "/media/backup2/2020_11_26";
     // omp_set_num_threads(8);
     std::string datadir = root + "/radar";
-    std::string gt = root + "/radar_groundtruth_icra2.csv";
+    // std::string gt = root + "/radar_groundtruth_icra2.csv";
+    std::string gt = root + "/applanix/radar_loc_gt.csv";
+
     // YAML::Node node = YAML::LoadFile("/home/keenan/radar_ws/src/yeti/yeti/config/feature_matching.yaml");
 
     bool interp = true;
@@ -140,6 +158,7 @@ int main(int argc, char *argv[]) {
 
     std::ifstream ifs(gt);
     std::string line;
+    std::getline(ifs, line);  // Clear out the header
 
     int i = 0;
     while (std::getline(ifs, line)) {
@@ -149,7 +168,7 @@ int main(int argc, char *argv[]) {
         int64_t time1 = std::stoll(parts[0]) / 1000;
         int64_t time2 = std::stoll(parts[1]) / 1000;
         std::vector<double> gtvec;
-        for (uint j = 2; j < 9; ++j) {
+        for (uint j = 2; j < parts.size(); ++j) {
             gtvec.push_back(std::stod(parts[j]));
         }
 
@@ -212,36 +231,40 @@ int main(int argc, char *argv[]) {
         Eigen::MatrixXd p1temp = p1, p2temp = p2;
 
         // Remove Doppler effects (first)
-        double v1 = gtvec[3];
-        double v2 = gtvec[5];
-        removeDoppler(p1, v1, beta);
-        removeDoppler(p2, v2, beta);
+        Eigen::Vector3d vbar1 = {gtvec[3], gtvec[4], 0};
+        Eigen::Vector3d vbar2 = {gtvec[6], gtvec[7], 0};
+        // double v1 = gtvec[3];
+        // double v2 = gtvec[5];
+        removeDoppler(p1, vbar1, beta);
+        removeDoppler(p2, vbar2, beta);
         srand(i);
         Eigen::MatrixXd T2 = computeAndGetTransform(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
 
         // Remove motion distortion from the pointclouds (second)
         Eigen::VectorXd wbar1 = Eigen::VectorXd::Zero(6);
         wbar1(0) = gtvec[3];
-        wbar1(5) = gtvec[4];
-        removeMotionDistortion(p1, t1prime, wbar1, time1);
+        wbar1(1) = gtvec[4];
+        wbar1(5) = gtvec[5];
+        removeMotionDistortion(p1, t1prime, wbar1, times1[times1.size() - 1]);
         Eigen::VectorXd wbar2 = Eigen::VectorXd::Zero(6);
-        wbar2(0) = gtvec[5];
-        wbar2(5) = gtvec[6];
-        removeMotionDistortion(p2, t2prime, wbar2, time2);
+        wbar2(0) = gtvec[6];
+        wbar2(1) = gtvec[7];
+        wbar2(5) = gtvec[8];
+        removeMotionDistortion(p2, t2prime, wbar2, times2[times2.size() - 1]);
         srand(i);
         Eigen::MatrixXd T3 = computeAndGetTransform(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
 
         // Remove motion distortion (first)
         p1 = p1temp;
         p2 = p2temp;
-        removeMotionDistortion(p1, t1prime, wbar1, time1);
-        removeMotionDistortion(p2, t1prime, wbar1, time1);
+        removeMotionDistortion(p1, t1prime, wbar1, times1[times1.size() - 1]);
+        removeMotionDistortion(p2, t2prime, wbar2, times2[times2.size() - 1]);
         srand(i);
         Eigen::MatrixXd T4 = computeAndGetTransform(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
 
         // Remove Doppler effects (second)
-        removeDoppler(p1, v1, beta);
-        removeDoppler(p2, v2, beta);
+        removeDoppler(p1, vbar1, beta);
+        removeDoppler(p2, vbar2, beta);
         srand(i);
         Eigen::MatrixXd T5 = computeAndGetTransform(p2, p1, ransac_threshold, inlier_ratio, max_iterations);
 

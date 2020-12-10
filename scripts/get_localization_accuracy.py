@@ -1,16 +1,18 @@
 import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
+from get_radar_loc_gt import yaw, rotToYawPitchRoll
 
 def getRotDiff(r1, r2):
-    if r1 < 0:
-        r1 = r1 + 2 * np.pi
-    if r2 < 0:
-        r2 = r2 + 2 * np.pi
-    return abs(r1 - r2)
+    C1 = yaw(r1)
+    C2 = yaw(r2)
+    C_err = np.matmul(C2.transpose(), C1)
+    yaw_err, _, _ = rotToYawPitchRoll(C_err)
+    return abs(yaw_err)
 
 if __name__ == "__main__":
-    file = "localization_accuracy_icra3.csv"
+    # file = "localization_accuracy_icra3.csv"
+    file = "localization_accuracy_2020_11_26.csv"
 
     dt1 = []
     dt2 = []
@@ -23,59 +25,28 @@ if __name__ == "__main__":
     dr4 = []
     dr5 = []
 
-    threshold = 10
-    rot_hold = 10
-
-    i = 0
     with open(file, 'r') as f:
         f.readline()
         for line in f:
-            i += 1
             row = line.split(',')
-            gtx = float(row[16])
-            gty = float(row[15])
-
-            if gty > 0:
-                gtx *= -1
-                gty *= -1
-
-            gtr = np.sqrt(gtx**2 + gty**2)
+            gtx = float(row[15])
+            gty = float(row[16])
             gtyaw = float(row[17])
 
-            dt = np.sqrt((gtx - float(row[0]))**2 + (gty - float(row[1]))**2)
-            if dt < threshold:
-                dt1.append(dt)
-                dr = 180 * getRotDiff(gtyaw, float(row[2])) / np.pi
-                if dr < rot_hold:
-                    dr1.append(dr)
+            dt1.append(np.sqrt((gtx - float(row[0]))**2 + (gty - float(row[1]))**2))
+            dr1.append(180 * getRotDiff(gtyaw, float(row[2])) / np.pi)
 
-            dt = np.sqrt((gtx - float(row[3]))**2 + (gty - float(row[4]))**2)
-            if dt < threshold:
-                dt2.append(dt)
-                dr = 180 * getRotDiff(gtyaw, float(row[5])) / np.pi
-                if dr < rot_hold:
-                    dr2.append(dr)
+            dt2.append(np.sqrt((gtx - float(row[3]))**2 + (gty - float(row[4]))**2))
+            dr2.append(180 * getRotDiff(gtyaw, float(row[5])) / np.pi)
 
-            dt = np.sqrt((gtx - float(row[6]))**2 + (gty - float(row[7]))**2)
-            if dt < threshold:
-                dt3.append(dt)
-                dr = 180 * getRotDiff(gtyaw, float(row[8])) / np.pi
-                if dr < rot_hold:
-                    dr3.append(dr)
+            dt3.append(np.sqrt((gtx - float(row[6]))**2 + (gty - float(row[7]))**2))
+            dr3.append(180 * getRotDiff(gtyaw, float(row[8])) / np.pi)
 
-            dt = np.sqrt((gtx - float(row[9]))**2 + (gty - float(row[10]))**2)
-            if dt < threshold:
-                dt4.append(dt)
-                dr = 180 * getRotDiff(gtyaw, float(row[11])) / np.pi
-                if dr < rot_hold:
-                    dr4.append(dr)
+            dt4.append(np.sqrt((gtx - float(row[9]))**2 + (gty - float(row[10]))**2))
+            dr4.append(180 * getRotDiff(gtyaw, float(row[11])) / np.pi)
 
-            dt = np.sqrt((gtx - float(row[12]))**2 + (gty - float(row[13]))**2)
-            if dt < threshold:
-                dt5.append(dt)
-                dr = 180 * getRotDiff(gtyaw, float(row[14])) / np.pi
-                if dr < rot_hold:
-                    dr5.append(dr)
+            dt5.append(np.sqrt((gtx - float(row[12]))**2 + (gty - float(row[13]))**2))
+            dr5.append(180 * getRotDiff(gtyaw, float(row[14])) / np.pi)
 
     dt1 = np.array(dt1)
     dt2 = np.array(dt2)
@@ -97,7 +68,7 @@ if __name__ == "__main__":
     matplotlib.rcParams.update({"font.size" : 16, 'xtick.labelsize' : 16, 'ytick.labelsize' : 16,
                                 'axes.linewidth' : 1.5, 'font.family' : 'serif', 'pdf.fonttype' : 42})
     plt.figure(figsize=(10, 5.5))
-    bins = np.arange(0, 9.0, 0.5)
+    bins = np.arange(0, 4.0, 0.25)
     plt.grid(which='both', linestyle='--', alpha=0.5, axis='y')
     plt.hist([dt1, dt4, dt3], bins=bins, label=['RIGID', 'MC', 'MC+Dopp'], color=['r', 'b', 'limegreen'], rwidth=0.6)
     plt.xlabel('Translation Error (m)', fontsize=18)

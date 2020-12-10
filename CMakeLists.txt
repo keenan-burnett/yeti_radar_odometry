@@ -73,13 +73,6 @@ target_link_libraries(visualization
 	${Boost_INCLUDE_DIRS}
 )
 
-add_executable(mapping src/mapping.cpp)
-target_link_libraries(mapping
-	${DEPEND_LIBS}
-	${catkin_LIBRARIES}
-	${OpenCV_LIBRARIES}
-)
-
 add_executable(scan_matching_basic src/scan_matching_basic.cpp)
 target_link_libraries(scan_matching_basic
     features
@@ -96,22 +89,6 @@ target_link_libraries(scan_matching_test
 	${catkin_LIBRARIES}
 	${OpenCV_LIBRARIES}
     ${libpointmatcher_LIBRARIES}
-)
-
-add_executable(build_map src/build_map.cpp)
-target_link_libraries(build_map
-    features
-    radar_utils
-	${catkin_LIBRARIES}
-	${OpenCV_LIBRARIES}
-    ${libpointmatcher_LIBRARIES}
-)
-
-add_executable(test_association src/test_association.cpp)
-target_link_libraries(test_association
-    association
-	${catkin_LIBRARIES}
-	${OpenCV_LIBRARIES}
 )
 
 find_library(yaml-cpp REQUIRED)
@@ -171,13 +148,4 @@ target_link_libraries(test_localization
 	${OpenCV_LIBRARIES}
     ${libpointmatcher_LIBRARIES}
     # yaml-cpp
-)
-
-add_executable(lidar_loc_gt src/lidar_loc_gt.cpp)
-target_link_libraries(lidar_loc_gt
-    features
-    radar_utils
-	${catkin_LIBRARIES}
-	${OpenCV_LIBRARIES}
-    ${libpointmatcher_LIBRARIES}
 )
