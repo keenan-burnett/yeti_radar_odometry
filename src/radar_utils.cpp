@@ -14,6 +14,7 @@ static inline bool exists(const std::string& name) {
     return !(stat (name.c_str(), &buffer) == 0);
 }
 
+// assumes file names are EPOCH times which can be sorted numerically
 struct less_than_img {
     inline bool operator() (const std::string& img1, const std::string& img2) {
         std::vector<std::string> parts;
@@ -25,8 +26,8 @@ struct less_than_img {
     }
 };
 
-void get_file_names(std::string datadir, std::vector<std::string> &radar_files, std::string extension) {
-    DIR *dirp = opendir(datadir.c_str());
+void get_file_names(std::string path, std::vector<std::string> &files, std::string extension) {
+    DIR *dirp = opendir(path.c_str());
     struct dirent *dp;
     while ((dp = readdir(dirp)) != NULL) {
         if (exists(dp->d_name)) {
@@ -36,11 +37,11 @@ void get_file_names(std::string datadir, std::vector<std::string> &radar_files, 
                 if (parts[parts.size() - 1].compare(extension) != 0)
                     continue;
             }
-            radar_files.push_back(dp->d_name);
+            files.push_back(dp->d_name);
         }
     }
     // Sort files in ascending order of time stamp
-    std::sort(radar_files.begin(), radar_files.end(), less_than_img());
+    std::sort(files.begin(), files.end(), less_than_img());
 }
 
 void load_radar(std::string path, std::vector<int64_t> &timestamps, std::vector<double> &azimuths,
@@ -348,10 +349,11 @@ void draw_points(cv::Mat &vis, Eigen::MatrixXd cart_targets, float cart_resoluti
     std::vector<cv::Point2f> bev_points;
     convert_to_bev(cart_targets, cart_resolution, cart_pixel_width, bev_points);
     for (cv::Point2f p : bev_points) {
-        if (vis.depth() == CV_8UC1)
-            vis.at<cv::Vec3b>(int(p.y), int(p.x)) = cv::Vec3b(color[0], color[1], color[2]);
-        if (vis.depth() == CV_32F)
-            vis.at<cv::Vec3f>(int(p.y), int(p.x)) = cv::Vec3f(color[0], color[1], color[2]);
+        cv::circle(vis, p, 1, cv::Scalar(color[0], color[1], color[2]), -1);
+        // if (vis.depth() == CV_8UC1)
+        //     vis.at<cv::Vec3b>(int(p.y), int(p.x)) = cv::Vec3b(color[0], color[1], color[2]);
+        // if (vis.depth() == CV_32F)
+        //     vis.at<cv::Vec3f>(int(p.y), int(p.x)) = cv::Vec3f(color[0], color[1], color[2]);
     }
 }
 

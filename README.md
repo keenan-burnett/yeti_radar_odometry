@@ -34,6 +34,8 @@ OpenCV 3
 yaml-cpp
 ```
 
+Note: I have only tested that this code compiles on Ubuntu 16.04, but it should compile for newer versions of Ubuntu.
+
 Note: we provide a Dockerfile which can be used to build a docker image with all the required deps already installed.
 
 These build instructions assume you are building your project using a catkin workspace with catkin build.
@@ -66,11 +68,13 @@ Example usage:
 ./build/yeti/odometry <sequence_name>
 ```
 
-`localization.cpp` This program peforms metric localization between radar scans collected in opposite directions. This example relies data taken from our own platform, Boreas. Dowload some example data for this using this script (1.6 GB):
+`localization.cpp` This program peforms metric localization between radar scans collected in opposite directions. This example relies data taken from our own platform, Boreas. Dowload some example data for this using this script (54 GB):
 
 ```
-./scripts/download_data.sh
+scripts/download_data.sh
 ```
+
+Note that you'll need to be set up with an AWS S3 account and have their CLI installed.
 
 Example usage: (Note that the location of your data and the ground truth csv is hard-coded for now.)
 ```

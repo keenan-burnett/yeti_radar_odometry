@@ -1,8 +1,4 @@
 #!/bin/bash
-pip install gdown
-gdown https://drive.google.com/uc?id=1F3GeBC3pXa0ofGhxYboN135BrlHV-Jtb -O yeti_data.zip
-unzip yeti_data.zip
-mkdir radar
-mv yeti_data/*.png radar
-rm -rf yeti_data
-rm yeti_data.zip
+mkdir 2020_11_26
+cd 2020_11_26
+aws s3 sync boreas-2020-11-26-13-58 . --exclude * --include applanix/* --include calib/* --include lidar/* --include radar/* --include *.html

@@ -59,6 +59,8 @@ if __name__ == "__main__":
     dr4 = np.array(dr4)
     dr5 = np.array(dr5)
 
+    np.savetxt('dr3', dr3)
+
     print('RIGID: dt: {} sigma_dt: {} dr: {} sigma_dr: {}'.format(np.median(dt1), np.mean((dt1 - np.median(dt1))**2), np.median(dr1), np.mean((dr1 - np.median(dr1))**2)))
     print('DOPP ONLY: {} sigma_dt: {} dr: {} sigma_dr: {}'.format(np.median(dt2), np.mean((dt2 - np.median(dt2))**2), np.median(dr2), np.mean((dr2 - np.median(dr2))**2)))
     print('DOPP + MD: {} sigma_dt: {} dr: {} sigma_dr: {}'.format(np.median(dt3), np.mean((dt3 - np.median(dt3))**2), np.median(dr3), np.mean((dr3 - np.median(dr3))**2)))

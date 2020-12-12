@@ -75,8 +75,8 @@ bool get_groundtruth_data(std::string gtfile, std::string sensor_file, std::vect
 // Unwarping the cartesian image instead of target points is tricky.
 // We need to do the opposite and "warp" the ideal output to find the pixel locations in the original, distorted image.
 void undistort_radar_image(cv::Mat &input, cv::Mat &output, Eigen::VectorXd wbar, float cart_resolution,
-    int cart_pixel_width, std::vector<int64_t> radar_times, std::vector<double> azimuths) {
-    double beta = 0.049;
+    int cart_pixel_width, std::vector<int64_t> radar_times, std::vector<double> azimuths, double beta,
+    bool remove_doppler, bool remove_motion) {
     float cart_min_range = (cart_pixel_width / 2) * cart_resolution;
     if (cart_pixel_width % 2 == 0)
         cart_min_range = (cart_pixel_width / 2 - 0.5) * cart_resolution;
@@ -130,13 +130,17 @@ void undistort_radar_image(cv::Mat &input, cv::Mat &output, Eigen::VectorXd wbar
             double idx = get_azimuth_index(azimuths, psi);
 
             Eigen::Vector4d xbar = {x_u, y_u, 0, 1};
-            xbar = transforms[int(round(idx))] * xbar;
+            if (remove_motion)
+                xbar = transforms[int(round(idx))] * xbar;
+
             float x_d = xbar(0);
             float y_d = xbar(1);
 
-            double delta_r = beta * (wbar(0) * cos(psi) + wbar(1) * sin(psi));
-            x_d -= delta_r * cos(psi);
-            y_d -= delta_r * sin(psi);
+            if (remove_doppler) {
+                double delta_r = beta * (wbar(0) * cos(psi) + wbar(1) * sin(psi));
+                x_d -= delta_r * cos(psi);
+                y_d -= delta_r * sin(psi);
+            }
 
             // Convert into BEV pixel coordinates
             float u_bev = (cart_min_range + y_d) / cart_resolution;
@@ -169,6 +173,7 @@ int main() {
 
     std::vector<uint> green = {0, 255, 0};
     std::vector<uint> red = {0, 0, 255};
+    std::vector<uint> blue = {255, 0, 0};
 
     std::ifstream ifs(radar_gt_file);
     std::string line;
@@ -184,7 +189,7 @@ int main() {
             radar_gt.push_back(std::stod(parts[j]));
         }
         double v = sqrt(pow(radar_gt[4], 2) + pow(radar_gt[5], 2));
-        if (v < 15.0)
+        if (v < 14.0)
             continue;
 
         std::string radar_file = parts[0] + ".png";
@@ -256,7 +261,6 @@ int main() {
         std::vector<int64_t> t1;
         polar_to_cartesian_points(azimuths, radar_times, targets, radar_resolution, cart_targets, t1);
 
-        // cv::Mat vis = cv::Mat::zeros(cart_pixel_width, cart_pixel_width, CV_8UC3);
         cv::Mat vis;
         draw_points(cart_img, pc2, cart_resolution, cart_pixel_width, vis, red);
         draw_points(vis, cart_targets, cart_resolution, cart_pixel_width, green);
@@ -269,16 +273,14 @@ int main() {
         cv::line(vis, cross_points[0], cross_points[1], cv::Scalar(255, 255, 255));
         cv::line(vis, cross_points[2], cross_points[3], cv::Scalar(255, 255, 255));
 
-        cv::imshow("radar points (green) distorted", vis);
+        cv::imshow("radar (green) distorted", vis);
 
-        // Remove Doppler and motion distortion from the radar targets
+        // Remove Doppler distortion only
         removeDoppler(cart_targets, vbar_radar, beta);
-        removeMotionDistortion(cart_targets, t1, wbar_radar, radar_times[radar_times.size() - 1]);
 
-        // cv::Mat vis2 = cv::Mat::zeros(cart_pixel_width, cart_pixel_width, CV_8UC3);
         cv::Mat undistort;
         undistort_radar_image(cart_img, undistort, wbar_radar, cart_resolution, cart_pixel_width,
-            radar_times, azimuths);
+            radar_times, azimuths, beta, true, false);
         cv::Mat vis2;
         draw_points(undistort, pc2, cart_resolution, cart_pixel_width, vis2, red);
         draw_points(vis2, cart_targets, cart_resolution, cart_pixel_width, green);
@@ -286,7 +288,23 @@ int main() {
         cv::line(vis2, cross_points[0], cross_points[1], cv::Scalar(255, 255, 255));
         cv::line(vis2, cross_points[2], cross_points[3], cv::Scalar(255, 255, 255));
 
-        cv::imshow("radar points (green) undistorted", vis2);
+        cv::imshow("radar (green) Doppler distortion removed", vis2);
+
+        // Remove both Doppler and motion distortion from the radar targets
+        removeMotionDistortion(cart_targets, t1, wbar_radar, radar_times[radar_times.size() - 1]);
+
+        cv::Mat undistort2;
+        undistort_radar_image(cart_img, undistort2, wbar_radar, cart_resolution, cart_pixel_width,
+            radar_times, azimuths, beta, true, true);
+        cv::Mat vis3;
+        draw_points(undistort2, pc2, cart_resolution, cart_pixel_width, vis3, red);
+        draw_points(vis3, cart_targets, cart_resolution, cart_pixel_width, green);
+
+        cv::line(vis3, cross_points[0], cross_points[1], cv::Scalar(255, 255, 255));
+        cv::line(vis3, cross_points[2], cross_points[3], cv::Scalar(255, 255, 255));
+
+        cv::imshow("radar (green) Doppler and Motion distortion removed", vis3);
+
         cv::waitKey(0);
     }
 }
