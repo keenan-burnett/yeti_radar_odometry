@@ -52,27 +52,14 @@ void load_radar(std::string path, std::vector<int64_t> &timestamps, std::vector<
     azimuths = std::vector<double>(N, 0);
     valid = std::vector<bool>(N, true);
     int range_bins = 3768;
-    double azimuth_step = M_PI / 200;
-    int64_t time_step = 625;
-    int64 time_end = 0;
-    if (navtech_version == CIR204) {
+    if (navtech_version == CIR204)
         range_bins = 3360;
-        std::vector<std::string> parts;
-        boost::split(parts, path, boost::is_any_of("."));
-        std::string fname = parts[0];
-        boost::split(parts, fname, boost::is_any_of("/"));
-        time_end = std::stoll(parts[parts.size() - 1]) / 1000;
-    }
     fft_data = cv::Mat::zeros(N, range_bins, CV_32F);
+#pragma omp parallel
     for (int i = 0; i < N; ++i) {
         uchar* byteArray = raw_example_data.ptr<uchar>(i);
-        if (navtech_version == CIR204) {
-            azimuths[i] = i * azimuth_step;
-            timestamps[i] = time_end - (N - i) * time_step;
-        } else {
-            timestamps[i] = *((int64_t *)(byteArray));
-            azimuths[i] = *((uint16_t *)(byteArray + 8)) * 2 * M_PI / double(encoder_size);
-        }
+        timestamps[i] = *((int64_t *)(byteArray));
+        azimuths[i] = *((uint16_t *)(byteArray + 8)) * 2 * M_PI / double(encoder_size);
         valid[i] = byteArray[10] == 255;
         for (int j = 42; j < range_bins; j++) {
             fft_data.at<float>(i, j) = (float)*(byteArray + 11 + j) / 255.0;
@@ -147,6 +134,57 @@ void load_velodyne2(std::string path, Eigen::MatrixXd &pc) {
     }
 }
 
+static float getFloatFromByteArray(char *byteArray, uint index) {
+    return *( (float *)(byteArray + index));
+}
+
+// Input is a .bin binary file.
+void load_velodyne3(std::string path, Eigen::MatrixXd &pc, Eigen::MatrixXd & intensities, std::vector<float> &times) {
+    std::ifstream ifs(path, std::ios::binary);
+    std::vector<char> buffer(std::istreambuf_iterator<char>(ifs), {});
+    int float_offset = 4;
+    int fields = 6;  // x, y, z, i, r, t
+    int N = buffer.size() / (float_offset * fields);
+    int point_step = float_offset * fields;
+    pc = Eigen::MatrixXd::Ones(4, N);
+    intensities = Eigen::MatrixXd::Zero(1, N);
+    times = std::vector<float>(N);
+    int j = 0;
+    for (uint i = 0; i < buffer.size(); i += point_step) {
+        pc(0, j) = getFloatFromByteArray(buffer.data(), i);
+        pc(1, j) = getFloatFromByteArray(buffer.data(), i + float_offset);
+        pc(2, j) = getFloatFromByteArray(buffer.data(), i + float_offset * 2);
+        intensities(0, j) = getFloatFromByteArray(buffer.data(), i + float_offset * 3);
+        times[j] = getFloatFromByteArray(buffer.data(), i + float_offset * 5);
+        j++;
+    }
+}
+
+double get_azimuth_index(std::vector<double> &azimuths, double azimuth) {
+    double mind = 1000;
+    double closest = 0;
+    int M = azimuths.size();
+    for (uint i = 0; i < azimuths.size(); ++i) {
+        double d = fabs(azimuths[i] - azimuth);
+        if (d < mind) {
+            mind = d;
+            closest = i;
+        }
+    }
+    if (azimuths[closest] < azimuth) {
+        double delta = 0;
+        if (closest < M - 1)
+            delta = (azimuth - azimuths[closest]) / (azimuths[closest + 1] - azimuths[closest]);
+        closest += delta;
+    } else if (azimuths[closest] > azimuth){
+        double delta = 0;
+        if (closest > 0)
+            delta = (azimuths[closest] - azimuth) / (azimuths[closest] - azimuths[closest - 1]);
+        closest -= delta;
+    }
+    return closest;
+}
+
 void radar_polar_to_cartesian(std::vector<double> &azimuths, cv::Mat &fft_data, float radar_resolution,
     float cart_resolution, int cart_pixel_width, bool interpolate_crossover, cv::Mat &cart_img, int output_type,
     int navtech_version) {
@@ -174,10 +212,6 @@ void radar_polar_to_cartesian(std::vector<double> &azimuths, cv::Mat &fft_data, 
     cv::Mat angle = cv::Mat::zeros(cart_pixel_width, cart_pixel_width, CV_32F);
 
     double azimuth_step = azimuths[1] - azimuths[0];
-    if (navtech_version == CIR204) {
-        azimuths[0] = 0;
-        azimuth_step = M_PI / 200;
-    }
 #pragma omp parallel for collapse(2)
     for (int i = 0; i < range.rows; ++i) {
         for (int j = 0; j < range.cols; ++j) {
@@ -190,7 +224,11 @@ void radar_polar_to_cartesian(std::vector<double> &azimuths, cv::Mat &fft_data, 
             float theta = atan2f(y, x);
             if (theta < 0)
                 theta += 2 * M_PI;
-            angle.at<float>(i, j) = (theta - azimuths[0]) / azimuth_step;
+            if (navtech_version == CIR204) {
+                angle.at<float>(i, j) = get_azimuth_index(azimuths, theta);
+            } else {
+                angle.at<float>(i, j) = (theta - azimuths[0]) / azimuth_step;
+            }
         }
     }
     if (interpolate_crossover) {
@@ -292,16 +330,28 @@ void convert_from_bev(std::vector<cv::KeyPoint> bev_points, float cart_resolutio
 }
 
 void draw_points(cv::Mat cart_img, Eigen::MatrixXd cart_targets, float cart_resolution, int cart_pixel_width,
-    cv::Mat &vis) {
+    cv::Mat &vis, std::vector<uint> color) {
     std::vector<cv::Point2f> bev_points;
     convert_to_bev(cart_targets, cart_resolution, cart_pixel_width, bev_points);
     cv::cvtColor(cart_img, vis, cv::COLOR_GRAY2BGR);
     for (cv::Point2f p : bev_points) {
         // cv::circle(vis, p, 2, cv::Scalar(0, 0, 255), -1);
         if (cart_img.depth() == CV_8UC1)
-            vis.at<cv::Vec3b>(int(p.y), int(p.x)) = cv::Vec3f(0, 0, 255);
+            vis.at<cv::Vec3b>(int(p.y), int(p.x)) = cv::Vec3b(color[0], color[1], color[2]);
         if (cart_img.depth() == CV_32F)
-            vis.at<cv::Vec3f>(int(p.y), int(p.x)) = cv::Vec3f(0, 0, 255);
+            vis.at<cv::Vec3f>(int(p.y), int(p.x)) = cv::Vec3f(color[0], color[1], color[2]);
+    }
+}
+
+void draw_points(cv::Mat &vis, Eigen::MatrixXd cart_targets, float cart_resolution, int cart_pixel_width,
+    std::vector<uint> color) {
+    std::vector<cv::Point2f> bev_points;
+    convert_to_bev(cart_targets, cart_resolution, cart_pixel_width, bev_points);
+    for (cv::Point2f p : bev_points) {
+        if (vis.depth() == CV_8UC1)
+            vis.at<cv::Vec3b>(int(p.y), int(p.x)) = cv::Vec3b(color[0], color[1], color[2]);
+        if (vis.depth() == CV_32F)
+            vis.at<cv::Vec3f>(int(p.y), int(p.x)) = cv::Vec3f(color[0], color[1], color[2]);
     }
 }
 

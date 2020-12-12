@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>
 #include <string>
 #include <fstream>
 #include "matplotlibcpp.h"  // NOLINT
@@ -11,48 +12,85 @@
 #include "association.hpp"
 namespace plt = matplotlibcpp;
 
-double beta = 0.0488;
-
-Eigen::MatrixXd get_transform(std::vector<double> gt) {
-    Eigen::Vector3d p = {gt[1], gt[2], gt[3]};
-    Eigen::Vector4d qbar = {gt[4], gt[5], gt[6], gt[7]};
-    double EPS = 1e-15;
-    Eigen::MatrixXd R = Eigen::MatrixXd::Identity(3, 3);
-    if (qbar.transpose() * qbar > EPS) {
-        Eigen::Vector3d epsilon = {gt[4], gt[5], gt[6]};
-        double eta = gt[7];
-        Eigen::Matrix3d epsilon_cross;
-        epsilon_cross << 0, -epsilon(2), epsilon(1),
-                         epsilon(2), 0, -epsilon(0),
-                         -epsilon(1), epsilon(0), 0;
-        Eigen::Matrix3d I = Eigen::MatrixXd::Identity(3, 3);
-        R = (pow(eta, 2.0) - epsilon.transpose() * epsilon) * I +
-            2 * (epsilon * epsilon.transpose()) - 2 * eta * epsilon_cross;
+void removeDoppler(Eigen::MatrixXd &p, Eigen::Vector3d vbar, double beta) {
+    for (uint j = 0; j < p.cols(); ++j) {
+        double phi = atan2f(p(1, j), p(0, j));
+        double delta_r = beta * (vbar(0) * cos(phi) + vbar(1) * sin(phi));
+        p(0, j) += delta_r * cos(phi);
+        p(1, j) += delta_r * sin(phi);
     }
-    enforce_orthogonality(R);
-    Eigen::Matrix4d T = Eigen::Matrix4d::Identity();
-    T << R.transpose(), p, 0, 0, 0, 1.0;
-    return T;
 }
 
-void undistort_radar_image(cv::Mat &input, cv::Mat &output, Eigen::VectorXd wbar, float cart_resolution,
-    int cart_pixel_width) {
+void removeMotionDistortion(Eigen::MatrixXd &p, std::vector<int64_t> tprime, Eigen::VectorXd wbar, int64_t t_ref) {
+    for (uint j = 0; j < p.cols(); ++j) {
+        double delta_t = (tprime[j] - t_ref) / 1.0e6;
+        Eigen::MatrixXd T = se3ToSE3(wbar * delta_t);
+        Eigen::Vector4d pbar = {p(0, j), p(1, j), 0, 1};
+        pbar = T * pbar;
+        p(0, j) = pbar(0);
+        p(1, j) = pbar(1);
+    }
+}
 
-    std::vector<double> azimuths(400);
-    azimuths[0] = 0;
-    double azimuth_step = M_PI / 200;
-    for (uint i = 1; i < azimuths.size(); ++i) {
-        azimuths[i] = azimuths[i - 1] + azimuth_step;
+int get_closest_lidar(int64_t query_time, std::vector<std::string> lidar_files) {
+    double min_delta = 0.25;
+    int closest_lidar = -1;
+    for (uint j = 0; j < lidar_files.size(); ++j) {
+        std::vector<std::string> parts;
+        boost::split(parts, lidar_files[j], boost::is_any_of("."));
+        int64_t t = std::stoll(parts[0]);
+        double delta = fabs((t - query_time) / 1.0e9);
+        if (delta < min_delta) {
+            min_delta = delta;
+            closest_lidar = j;
+        }
     }
-    std::vector<double> times(400);
-    times[0] = 0;
-    double time_step = 0.000625;
-    for (uint i = 1; i < times.size(); ++i) {
-        times[i] = times[i - 1] + time_step;
+    assert(closest_lidar != -1);
+    return closest_lidar;
+}
+
+bool get_groundtruth_data(std::string gtfile, std::string sensor_file, std::vector<double> &gt) {
+    std::vector<std::string> farts;
+    boost::split(farts, sensor_file, boost::is_any_of("."));
+    std::string ftime = farts[0];   // Unique timestamp identifier for the sensor_file to search for
+    std::ifstream ifs(gtfile);
+    std::string line;
+    gt.clear();
+    bool gtfound = false;
+    std::getline(ifs, line);  // clear out the csv file header before searching
+    while (std::getline(ifs, line)) {
+        std::vector<std::string> parts;
+        boost::split(parts, line, boost::is_any_of(","));
+        if (parts[0] == ftime) {
+            for (uint i = 1; i < parts.size(); ++i) {
+                gt.push_back(std::stod(parts[i]));
+            }
+            gtfound = true;
+            break;
+        }
     }
+    return gtfound;
+}
+
+// Unwarping the cartesian image instead of target points is tricky.
+// We need to do the opposite and "warp" the ideal output to find the pixel locations in the original, distorted image.
+void undistort_radar_image(cv::Mat &input, cv::Mat &output, Eigen::VectorXd wbar, float cart_resolution,
+    int cart_pixel_width, std::vector<int64_t> radar_times, std::vector<double> azimuths) {
+    double beta = 0.049;
     float cart_min_range = (cart_pixel_width / 2) * cart_resolution;
     if (cart_pixel_width % 2 == 0)
         cart_min_range = (cart_pixel_width / 2 - 0.5) * cart_resolution;
+    std::vector<double> times(radar_times.size());
+    for (uint i = 0; i < radar_times.size(); ++i) {
+        times[i] = double(radar_times[i] / 1.0e6);
+    }
+    double t_ref = times[times.size() - 1];
+
+    std::vector<Eigen::Matrix4d> transforms(times.size());
+    for (uint i = 0; i < times.size(); ++i) {
+        double delta_t = times[i] - t_ref;
+        transforms[i] = get_inverse_tf(se3ToSE3(wbar * delta_t));
+    }
 
     cv::Mat map_x = cv::Mat::zeros(cart_pixel_width, cart_pixel_width, CV_32F);
     cv::Mat map_y = cv::Mat::zeros(cart_pixel_width, cart_pixel_width, CV_32F);
@@ -71,44 +109,43 @@ void undistort_radar_image(cv::Mat &input, cv::Mat &output, Eigen::VectorXd wbar
         }
     }
 
-    std::vector<Eigen::MatrixXd> transforms(400);
-    transforms[0] = Eigen::MatrixXd::Identity(4, 4);
-
-#pragma omp parallel for
-    for (uint i = 1; i < transforms.size(); ++i) {
-        Eigen::MatrixXd T = se3ToSE3(wbar * times[i]);
-        transforms[i] = T.inverse();
-    }
-
     cv::Mat orig_x = cv::Mat::zeros(cart_pixel_width, cart_pixel_width, CV_32F);
     cv::Mat orig_y = cv::Mat::zeros(cart_pixel_width, cart_pixel_width, CV_32F);
 
-    double vel = fabs(wbar(0, 0));
+    double v = sqrt(pow(wbar(0), 2) + pow(wbar(1), 2));
+    float r_min = v / 4;  // Prevents undefined warping behavior near sensor
 
 #pragma omp parallel for collapse(2)
     for (int i = 0; i < orig_x.rows; ++i) {
         for (int j = 0; j < orig_y.cols; ++j) {
-            float x = map_x.at<float>(i, j);
-            float y = map_y.at<float>(i, j);
+            // Undistorted cartesian coordinates
+            float x_u = map_x.at<float>(i, j);
+            float y_u = map_y.at<float>(i, j);
+            float r_u = sqrt(pow(x_u, 2) + pow(y_u, 2));
+            if (r_u < r_min)
+                continue;
+            double psi = atan2f(y_u, x_u);
+            psi = wrapto2pi(psi);
 
-            // Doppler distortion
-            double rsq = x * x + y * y;
-            x -= beta * vel * x * x / rsq;
-            y -= beta * vel * x * y / rsq;
+            double idx = get_azimuth_index(azimuths, psi);
 
-            Eigen::Vector4d pbar = {x, y, 0, 1};
+            Eigen::Vector4d xbar = {x_u, y_u, 0, 1};
+            xbar = transforms[int(round(idx))] * xbar;
+            float x_d = xbar(0);
+            float y_d = xbar(1);
 
-            // Motion distortion
-            float phi = atan2f(y, x);
-            if (phi < 0)
-                phi += 2 * M_PI;
-            int row = (phi - azimuths[0]) / azimuth_step;
-            pbar = transforms[row] * pbar;
+            double delta_r = beta * (wbar(0) * cos(psi) + wbar(1) * sin(psi));
+            x_d -= delta_r * cos(psi);
+            y_d -= delta_r * sin(psi);
 
-            float u = (cart_min_range + pbar(1)) / cart_resolution;
-            float v = (cart_min_range - pbar(0)) / cart_resolution;
-            orig_x.at<float>(i, j) = u;
-            orig_y.at<float>(i, j) = v;
+            // Convert into BEV pixel coordinates
+            float u_bev = (cart_min_range + y_d) / cart_resolution;
+            float v_bev = (cart_min_range - x_d) / cart_resolution;
+
+            if (0 <= u_bev && u_bev < cart_pixel_width && 0 <= v_bev && v_bev <= cart_pixel_width) {
+                orig_x.at<float>(i, j) = u_bev;
+                orig_y.at<float>(i, j) = v_bev;
+            }
         }
     }
 
@@ -116,112 +153,114 @@ void undistort_radar_image(cv::Mat &input, cv::Mat &output, Eigen::VectorXd wbar
 }
 
 int main() {
-    std::string root = "/home/keenan/Documents/data/boreas/2020_09_01/1598986495";
-    std::string radardir = root + "/radar";
-    std::string lidardir = root + "/lidar";
-    std::string gt = root + "/gps.csv";
+    std::string root = "/media/backup2/2020_11_26";
+    std::string radar_gt_file = root + "/applanix/radar_poses.csv";
+    std::string lidar_gt_file = root + "/applanix/lidar_poses.csv";
+    std::vector<std::string> lidar_files;
+    get_file_names(root + "/lidar/", lidar_files, "bin");
+
     float cart_resolution = 0.2384;
     int cart_pixel_width = 586;
     int min_range = 42;
     float radar_resolution = 0.0596;
-    bool interp = true;
-    float zq = 3.0;
+    float zq = 2.5;
     int sigma_gauss = 17;
-    // Get file names of the radar images
-    std::vector<std::string> radar_files;
-    get_file_names(radardir, radar_files);
-    std::vector<std::string> lidar_files;
-    get_file_names(lidardir, lidar_files, "txt");
-    // Get transform from LIDAR to radar frame
-    Eigen::Matrix4d T_radar_lidar = Eigen::Matrix4d::Identity();
-    double rot = 0.0483;
-    T_radar_lidar.block(0, 0, 2, 2) << cos(rot), sin(rot), -sin(rot), cos(rot);
+    float beta = 0.049;
 
-    cv::Mat f1;
-    std::vector<int64_t> t1;
+    std::vector<uint> green = {0, 255, 0};
+    std::vector<uint> red = {0, 0, 255};
 
-    for (uint i = 27; i < radar_files.size(); ++i) {
+    std::ifstream ifs(radar_gt_file);
+    std::string line;
+    std::getline(ifs, line);  // Clear out the header
+
+    int i = 0;
+    while (std::getline(ifs, line)) {
+        i++;
         std::vector<std::string> parts;
-        boost::split(parts, radar_files[i], boost::is_any_of("."));
-        int64 time1 = std::stoll(parts[0]);
-        time1 -= 0.10 * 1e9;
-        std::cout << "time: " << time1 << std::endl;
+        boost::split(parts, line, boost::is_any_of(","));
+        std::vector<double> radar_gt;
+        for (uint j = 1; j < parts.size(); ++j) {
+            radar_gt.push_back(std::stod(parts[j]));
+        }
+        double v = sqrt(pow(radar_gt[4], 2) + pow(radar_gt[5], 2));
+        if (v < 15.0)
+            continue;
 
-        // Get gps/imu info for the radar scan
-        std::vector<double> gtvec;
-        assert(get_groundtruth_odometry2(gt, time1, gtvec));
+        std::string radar_file = parts[0] + ".png";
+        int64_t radar_rostime = std::stoll(parts[0]);
+        std::cout << "radar ROS time: " << radar_rostime << std::endl;
 
-        Eigen::Matrix4d T_radar = get_transform(gtvec);
+        Eigen::Matrix4d T_enu_radar = getTransformFromGT(radar_gt);
+        Eigen::Matrix3d C_enu_radar = T_enu_radar.block(0, 0, 3, 3);
+        Eigen::Vector3d vbar_enu = {radar_gt[4], radar_gt[5], radar_gt[6]};
+        Eigen::Vector3d vbar_radar = C_enu_radar.transpose() * vbar_enu;
+        vbar_radar(2) = 0;
+        Eigen::VectorXd wbar_radar = Eigen::VectorXd::Zero(6, 1);
+        wbar_radar(0) = vbar_radar(0);
+        wbar_radar(1) = vbar_radar(1);
+        wbar_radar(5) = radar_gt[10];
 
-        double velocity = sqrt(pow(gtvec[8], 2) + pow(gtvec[9], 2));
-        double omega = gtvec[gtvec.size() - 1];
-        std::cout << " v: " << velocity << " w: " << omega << std::endl;
-        Eigen::VectorXd wbar = Eigen::VectorXd::Zero(6);
-        wbar(0) = velocity;
-        wbar(5) = omega;
+        std::cout << "radar wbar: " << std::endl << wbar_radar.transpose() << std::endl;
 
-        std::vector<int64_t> times;
+        std::vector<int64_t> radar_times;
         std::vector<double> azimuths;
         std::vector<bool> valid;
-        Eigen::MatrixXd targets;
-        Eigen::MatrixXd cart_targets;
-        std::vector<cv::Point2f> bev_points;
-        load_radar(radardir + "/" + radar_files[i], times, azimuths, valid, f1, CIR204);
-
-        // Get LIDAR pointcloud with timestamp closest to this radar scan
-        int64_t min_delta = 1000000000000;
-        int closest_lidar = 0;
-        for (uint j = 0; j < lidar_files.size(); ++j) {
-            std::vector<std::string> parts;
-            boost::split(parts, lidar_files[j], boost::is_any_of("."));
-            int64 t = std::stoll(parts[0]);
-            if (abs(t - time1) < min_delta) {
-                min_delta = abs(t - time1);
-                closest_lidar = j;
-            }
-        }
-        std::cout << "min_delta: " << double(min_delta / 1.0e9) << std::endl;
-
-        std::vector<int64_t> lidar_times;
-        std::vector<double> lidar_azimuths;
-        Eigen::MatrixXd pc;
-        load_velodyne2(lidardir + "/" + lidar_files[closest_lidar], pc);
-
-        // Need to transform pc into radar frame, and then remove motion distortion
-        Eigen::MatrixXd pc_distort = Eigen::MatrixXd::Zero(2, pc.cols());
-        Eigen::MatrixXd T_motion = Eigen::MatrixXd::Identity(4, 4);
-        for (uint j = 0; j < pc.cols(); ++j) {
-            if (pc(2, j) < -1.4)
-                continue;
-
-            if (sqrt(pow(pc(0, j), 2) + pow(pc(1, j), 2)) < 2.0)
-                continue;
-
-            // Remove motion distortion from LIDAR data
-            // double phi = atan2f(pc(1, j), pc(0, j));
-            // if (phi < 0)
-            //     phi += 2 * M_PI;
-            // // phi = 2 * M_PI - phi;
-            // double timestamp = 0.1 * (phi / (2 * M_PI));
-            // T_motion = se3ToSE3(wbar * timestamp);
-
-            Eigen::Vector4d p1bar = {pc(0, j), pc(1, j), 0, 1};
-            p1bar = T_radar_lidar * T_motion * p1bar;
-            pc_distort(0, j) = p1bar(0);
-            pc_distort(1, j) = -p1bar(1);
-        }
-
+        cv::Mat f1;
+        load_radar(root + "/radar/" + radar_file, radar_times, azimuths, valid, f1, CIR204);
         // Convert radar FFT data into cartesian image
         cv::Mat cart_img;
-        radar_polar_to_cartesian(azimuths, f1, radar_resolution, cart_resolution, cart_pixel_width, interp, cart_img,
+        radar_polar_to_cartesian(azimuths, f1, radar_resolution, cart_resolution, cart_pixel_width, true, cart_img,
             CV_32F, CIR204);
 
-        double min, max;
-        cv::minMaxLoc(cart_img, &min, &max);
-        cart_img *= 1.5;
+        // Get LIDAR pointcloud with timestamp closest to this radar scan
+        int closest_lidar = get_closest_lidar(radar_rostime, lidar_files);
+        std::cout << "closest lidar file: " << lidar_files[closest_lidar] << std::endl;
 
+        std::vector<float> lidar_times;
+        Eigen::MatrixXd intensities;
+        Eigen::MatrixXd pc;
+        load_velodyne3(root + "/lidar/" + lidar_files[closest_lidar], pc, intensities, lidar_times);
+        std::vector<double> lidar_gt;
+        assert(get_groundtruth_data(lidar_gt_file, lidar_files[closest_lidar], lidar_gt));
+        Eigen::Matrix4d T_enu_lidar = getTransformFromGT(lidar_gt);
+
+        // Filter the pointcloud
+        uint k = 0;
+        for (uint j = 0; j < pc.cols(); ++j) {
+            // Remove points close to the ground to make the visualization cleaner.
+            if (pc(2, j) < -1.4)
+                continue;
+            // Remove points close to the sensor to remove self-detections
+            if (sqrt(pow(pc(0, j), 2) + pow(pc(1, j), 2)) < 2.0)
+                continue;
+            pc.block(0, k, 4, 1) = pc.block(0, j, 4, 1);
+            lidar_times[k] = lidar_times[j];
+            k++;
+        }
+        pc.conservativeResize(4, k);
+        lidar_times.resize(k);
+
+        // Remove motion distortion from lidar data
+        removeMotionDistortion(pc, lidar_times, T_enu_lidar, lidar_gt, 0);
+
+        // Transform lidar data into the radar frame
+        Eigen::MatrixXd T_radar_lidar = get_inverse_tf(T_enu_radar) * T_enu_lidar;
+        pc = T_radar_lidar * pc;
+        Eigen::MatrixXd pc2 = Eigen::MatrixXd::Ones(3, pc.cols());
+        pc2.block(0, 0, 2, pc.cols()) = pc.block(0, 0, 2, pc.cols());
+
+        // Extract radar extract features
+        Eigen::MatrixXd targets, cart_targets;
+        cen2018features(f1, zq, sigma_gauss, min_range, targets);
+        std::vector<int64_t> t1;
+        polar_to_cartesian_points(azimuths, radar_times, targets, radar_resolution, cart_targets, t1);
+
+        // cv::Mat vis = cv::Mat::zeros(cart_pixel_width, cart_pixel_width, CV_8UC3);
         cv::Mat vis;
-        draw_points(cart_img, pc_distort, cart_resolution, cart_pixel_width, vis);
+        draw_points(cart_img, pc2, cart_resolution, cart_pixel_width, vis, red);
+        draw_points(vis, cart_targets, cart_resolution, cart_pixel_width, green);
+
         Eigen::MatrixXd cross = Eigen::MatrixXd::Zero(2, 4);
         double size = 2.5;
         cross << -size, size, 0, 0, 0, 0, -size, size;
@@ -230,18 +269,24 @@ int main() {
         cv::line(vis, cross_points[0], cross_points[1], cv::Scalar(255, 255, 255));
         cv::line(vis, cross_points[2], cross_points[3], cv::Scalar(255, 255, 255));
 
-        cv::imshow("distorted", vis);
+        cv::imshow("radar points (green) distorted", vis);
 
-        // Remove distortion from the radar cartesian image
+        // Remove Doppler and motion distortion from the radar targets
+        removeDoppler(cart_targets, vbar_radar, beta);
+        removeMotionDistortion(cart_targets, t1, wbar_radar, radar_times[radar_times.size() - 1]);
+
+        // cv::Mat vis2 = cv::Mat::zeros(cart_pixel_width, cart_pixel_width, CV_8UC3);
         cv::Mat undistort;
-        undistort_radar_image(cart_img, undistort, wbar, cart_resolution, cart_pixel_width);
+        undistort_radar_image(cart_img, undistort, wbar_radar, cart_resolution, cart_pixel_width,
+            radar_times, azimuths);
         cv::Mat vis2;
-        draw_points(undistort, pc_distort, cart_resolution, cart_pixel_width, vis2);
+        draw_points(undistort, pc2, cart_resolution, cart_pixel_width, vis2, red);
+        draw_points(vis2, cart_targets, cart_resolution, cart_pixel_width, green);
+
         cv::line(vis2, cross_points[0], cross_points[1], cv::Scalar(255, 255, 255));
         cv::line(vis2, cross_points[2], cross_points[3], cv::Scalar(255, 255, 255));
-        int buffer = 2;
 
-        cv::imshow("motion distort removed", vis2);
+        cv::imshow("radar points (green) undistorted", vis2);
         cv::waitKey(0);
     }
 }

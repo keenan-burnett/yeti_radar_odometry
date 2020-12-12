@@ -32,6 +32,10 @@ void load_velodyne(std::string path, std::vector<int64_t> &timestamps, std::vect
 
 void load_velodyne2(std::string path, Eigen::MatrixXd &pc);
 
+void load_velodyne3(std::string path, Eigen::MatrixXd &pc, Eigen::MatrixXd & intensities, std::vector<float> &times);
+
+double get_azimuth_index(std::vector<double> &azimuths, double azimuth);
+
 /*!
    \brief Decode a single Oxford Radar RobotCar Dataset radar example
    \param azimuths Rotation for each polar radar azimuth (radians)
@@ -92,7 +96,10 @@ void convert_from_bev(std::vector<cv::KeyPoint> bev_points, float cart_resolutio
    \param vis [out] Output image with the features drawn onto it
 */
 void draw_points(cv::Mat cart_img, Eigen::MatrixXd cart_targets, float cart_resolution, int cart_pixel_width,
-    cv::Mat &vis);
+    cv::Mat &vis, std::vector<uint> color = {0, 0, 255});
+
+void draw_points(cv::Mat &vis, Eigen::MatrixXd cart_targets, float cart_resolution, int cart_pixel_width,
+    std::vector<uint> color = {0, 0, 255});
 
 /*!
    \brief Retrieves the ground truth odometry between radar timestamps t1 and t2

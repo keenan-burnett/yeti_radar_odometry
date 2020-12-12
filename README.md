@@ -31,44 +31,12 @@ Dependencies:
 Eigen 3
 Boost 1.5.8
 OpenCV 3
-libnabo
-libpointmatcher
 yaml-cpp
-steam
 ```
 
 Note: we provide a Dockerfile which can be used to build a docker image with all the required deps already installed.
 
 These build instructions assume you are building your project using a catkin workspace with catkin build.
-
-Note: Eigen and OpenCV can be installed with ROS through ros-kinetic-eigen and ros-kinetic-opencv
-Just remember to add "source /opt/ros/kinetic/setup.bash" to your .bashrc
-
-Install Eigen, OpenCV and catkin tools:
-```
-sudo apt-get install -y ros-kinetic-eigen* ros-kinetic-opencv* python-catkin-tools
-```
-
-Alternative method for installing Eigen:
-
-```
-git clone https://gitlab.com/libeigen/eigen.git
-cd eigen && mkdir build && cd build && cmake .. && make && sudo make install
-```
-
-Installing libnabo:
-
-```
-git clone https://github.com/ethz-asl/libnabo.git
-cd libnabo && mkdir build && cd build && cmake .. && make && sudo make install
-```
-
-Installing libpointmatcher:
-
-```
-git clone https://github.com/ethz-asl/libpointmatcher.git
-cd libpointmatcher && mkdir build && cd build && cmake .. && make && sudo make install
-```
 
 Installing yaml-cpp:
 
@@ -77,25 +45,17 @@ git clone https://github.com/jbeder/yaml-cpp.git
 cd yaml-cpp && mkdir build && cd build && cmake .. && make && sudo make install
 ```
 
-Installing steam:
-
-```
-mkdir \~/steam_ws && cd \~steam_ws
-git clone https://github.com/utiasASRL/steam.git
-cd steam && git submodule update --init --remote && cd deps/catkin && catkin build && cd ../.. && catkin build
-```
-
 Building yeti:
 
 ```
 mkdir -p \~/yeti_ws/src/ && cd \~/yeti_ws/src
 git clone https://github.com/keenan-burnett/yeti.git
-cd ../.. && catkin init && catkin config --extend \~/steam_ws/devel/repo && catkin build
+cd .. && catkin build
 ```
 
 ## Examples
 
-`test_feature_matching.cpp` This program performs radar odometry and saves the output from the rigid estimator, motion-compensated, and motion+doppler compensated estimators.
+`odometry.cpp` This program performs radar odometry and saves the output from the rigid estimator, motion-compensated, and motion+doppler compensated estimators.
 
 This example relies on the [Oxford Radar Robotcar Dataset](https://oxford-robotics-institute.github.io/radar-robotcar-dataset/).
 
@@ -103,11 +63,10 @@ If you want to get started quickly, download their sample sequence. Note that th
 
 Example usage:
 ```
-cd build
-./test_feature_matching <sequence_name>
+./build/yeti/odometry <sequence_name>
 ```
 
-`test_localization.cpp` This program peforms metric localization between radar scans collected in opposite directions. This example relies data taken from our own platform, Boreas. Dowload some example data for this using this script (1.6 GB):
+`localization.cpp` This program peforms metric localization between radar scans collected in opposite directions. This example relies data taken from our own platform, Boreas. Dowload some example data for this using this script (1.6 GB):
 
 ```
 ./scripts/download_data.sh
@@ -115,8 +74,10 @@ cd build
 
 Example usage: (Note that the location of your data and the ground truth csv is hard-coded for now.)
 ```
-./test_localization
+./build/yeti/localization
 ```
+
+`showcase_distortion.cpp` This program is meant to showcase the motion distortion and Doppler distortion in the radar data. We remove motion distortion from lidar points and draw them onto the Cartesian radar image. In one image we have left in the motion distortion and Doppler distortion from the radar scan, in the other we have removed. This program can be used to get an intuitive understanding for the distortion effects. This program uses data taken on our own platform, Boreas. Download instructions are given above.
 
 ## Libraries
 We have written a few libraries, which may be useful to others:

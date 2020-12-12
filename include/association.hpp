@@ -230,3 +230,24 @@ private:
     */
     void dopplerCorrection(Eigen::VectorXd wbar, Eigen::VectorXd &p);
 };
+
+/*!
+   \brief Retrieve a 4x4 homogeneous transformation matrix T_enu_sensor for this ground truth vector.
+   \param gt [GPSTime,x,y,z,vel_x,vel_y,vel_z,roll,pitch,heading,ang_vel_z]
+*/
+Eigen::Matrix4d getTransformFromGT(std::vector<double> gt);
+
+/*!
+   \brief This function removes motion distortion from a cloud of points.
+   \param pc The input point cloud should be 4 x N, as in homogeneous coordinates (x, y, z, 1) (z = 0 for 2D data)
+   \param times Timestamps associated with each point, in seconds.
+   \param T_enu_sensor A global transformation from the nominal sensor position to the ENU frame,
+        used to transform the velocity vector from the ENU frame to the sensor frame.
+   \param gt [GPSTime,x,y,z,vel_x,vel_y,vel_z,roll,pitch,heading,ang_vel_z]
+   \param t_ref 0 (radar) --> use first time as reference, -1 (lidar) --> use last time as reference.
+*/
+void removeMotionDistortion(Eigen::MatrixXd &pc, std::vector<float> &times, Eigen::Matrix4d T_enu_sensor,
+    std::vector<double> gt, int t_ref);
+
+// Return the inverse of a 4x4 homogeneous transformation matrix
+Eigen::Matrix4d get_inverse_tf(Eigen::Matrix4d T);

@@ -1,6 +1,24 @@
 #include <association.hpp>
 #include <complex>
 
+static Eigen::Matrix3d roll(double r) {
+    Eigen::Matrix3d C1 = Eigen::Matrix3d::Identity();
+    C1 << 1, 0, 0, 0, cos(r), sin(r), 0, -sin(r), cos(r);
+    return C1;
+}
+
+static Eigen::Matrix3d pitch(double p) {
+    Eigen::Matrix3d C2 = Eigen::Matrix3d::Identity();
+    C2 << cos(p), 0, -sin(p), 0, 1, 0, sin(p), 0, cos(p);
+    return C2;
+}
+
+static Eigen::Matrix3d yaw(double y) {
+    Eigen::Matrix3d C3 = Eigen::Matrix3d::Identity();
+    C3 << cos(y), sin(y), 0, -sin(y), cos(y), 0, 0, 0, 1;
+    return C3;
+}
+
 void enforce_orthogonality(Eigen::MatrixXd &R) {
     if (R.cols() == 3) {
         const Eigen::Vector3d col1 = R.block(0, 1, 3, 1).normalized();
@@ -449,4 +467,82 @@ double MotionDistortedRansac::computeModel() {
     getInliers(w_best, best_inliers);
     get_motion_parameters(best_inliers, w_best);
     return double(best_inliers.size()) / double(p1bar.cols());
+}
+
+// gt vector: GPSTime,x,y,z,vel_x,vel_y,vel_z,roll,pitch,heading,ang_vel_z
+Eigen::Matrix4d getTransformFromGT(std::vector<double> gt) {
+    Eigen::Matrix4d T = Eigen::Matrix4d::Identity();
+    T(0, 3) = gt[1];
+    T(1, 3) = gt[2];
+    T(2, 3) = gt[3];
+    Eigen::Matrix3d C = roll(gt[7]) * pitch(gt[8]) * yaw(gt[9]);
+    T.block(0, 0, 3, 3) = C;
+    return T;
+}
+
+static int get_closest(std::vector<float> vec, float value) {
+    int closest = 0;
+    float mind = 10000;
+    for (uint i = 0; i < vec.size(); ++i) {
+        float d = fabs(vec[i] - value);
+        if (d < mind) {
+            mind = d;
+            closest = i;
+        }
+    }
+    return closest;
+}
+
+// The input point cloud should be 4 x N, as in homogeneous coordinates (x, y, z, 1) (z = 0 for 2D data)
+// gt vector: GPSTime,x,y,z,vel_x,vel_y,vel_z,roll,pitch,heading,ang_vel_z
+// For data collection on Boreas, t_ref = 0 for lidar, and t_ref = -1 for radar.
+void removeMotionDistortion(Eigen::MatrixXd &pc, std::vector<float> &times, Eigen::Matrix4d T_enu_sensor,
+    std::vector<double> gt, int t_ref) {
+    float t0 = times[0];  // Time at which the transform was obtained
+    if (t_ref == 0) {
+        t0 = times[0];
+    } else if (t_ref == -1) {
+        t0 = times[times.size() - 1];
+    }
+    Eigen::Vector3d vbar_enu = {gt[4], gt[5], gt[6]};
+    Eigen::Matrix3d C_sens_enu = get_inverse_tf(T_enu_sensor).block(0, 0, 3, 3);
+    Eigen::Vector3d vbar_sens = C_sens_enu * vbar_enu;
+    Eigen::MatrixXd varpi = Eigen::MatrixXd::Zero(6, 1);
+    varpi.block(0, 0, 3, 1) = vbar_sens;
+    varpi(5) = gt[10];
+
+    // Compute T_undistort for several discrete points along the scan
+    // This is a necessary simplication to make this function run quickly.
+    uint M = 100;
+    if (times.size() < M)
+        M = times.size();
+    std::vector<Eigen::Matrix4d> T_undistort_vec(M);
+    std::vector<float> delta_t_vec(M);
+
+    double min_delta_t = 0, max_delta_t = 0;
+    for (uint i = 1; i < times.size(); ++i) {
+        float delta_t = times[i] - t0;
+        if (delta_t < min_delta_t)
+            min_delta_t = delta_t;
+        if (delta_t > max_delta_t)
+            max_delta_t = delta_t;
+    }
+    for (uint i = 0; i < M; ++i) {
+        delta_t_vec[i] = min_delta_t + i * (max_delta_t - min_delta_t) / M;
+        T_undistort_vec[i] = se3ToSE3(varpi * delta_t_vec[i]);
+    }
+
+    for (uint i = 1; i < times.size(); ++i) {
+        float delta_t = times[i] - t0;
+        int idx = get_closest(delta_t_vec, delta_t);
+        pc.block(0, i, 4, 1) = T_undistort_vec[idx] * pc.block(0, i, 4, 1);
+    }
+}
+
+Eigen::Matrix4d get_inverse_tf(Eigen::Matrix4d T) {
+    Eigen::Matrix3d R = T.block(0, 0, 3, 3);
+    Eigen::Matrix4d T2 = Eigen::Matrix4d::Identity();
+    T2.block(0, 0, 3, 3) = R.transpose();
+    T2.block(0, 3, 3, 1) = -1 * R.transpose() * T.block(0, 3, 3, 1);
+    return T2;
 }

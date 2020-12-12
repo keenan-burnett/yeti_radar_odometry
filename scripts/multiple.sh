@@ -19,15 +19,11 @@ j=0
 while [ $j -le $i ]
 do
 	echo ${dir_array[$j]};
-	./build/yeti/test_feature_matching ${dir_array[$j]} ${dir_array[$j]} &
-	./build/yeti/test_feature_matching ${dir_array[$(( $j + 1 ))]} ${dir_array[$(( $j + 1 ))]} &
-	./build/yeti/test_feature_matching ${dir_array[$(( $j + 2 ))]} ${dir_array[$(( $j + 2 ))]} &
-	./build/yeti/test_feature_matching ${dir_array[$(( $j + 3 ))]} ${dir_array[$(( $j + 3 ))]} &
-	./build/yeti/test_feature_matching ${dir_array[$(( $j + 4 ))]} ${dir_array[$(( $j + 4 ))]} &
+	./build/yeti/odometry ${dir_array[$j]} ${dir_array[$j]} &
+	./build/yeti/odometry ${dir_array[$(( $j + 1 ))]} ${dir_array[$(( $j + 1 ))]} &
+	./build/yeti/odometry ${dir_array[$(( $j + 2 ))]} ${dir_array[$(( $j + 2 ))]} &
+	./build/yeti/odometry ${dir_array[$(( $j + 3 ))]} ${dir_array[$(( $j + 3 ))]} &
+	./build/yeti/odometry ${dir_array[$(( $j + 4 ))]} ${dir_array[$(( $j + 4 ))]} &
 	j=$(( $j + 5 ));
 	wait;
 done
-
-
-
-

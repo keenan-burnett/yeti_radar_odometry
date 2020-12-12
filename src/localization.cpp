@@ -9,10 +9,6 @@
 #include "radar_utils.hpp"
 #include "features.hpp"
 #include "association.hpp"
-#include "pointmatcher/PointMatcher.h"
-
-typedef PointMatcher<double> PM;
-typedef PM::DataPoints DP;
 
 void removeDoppler(Eigen::MatrixXd &p, Eigen::Vector3d vbar, double beta) {
     for (uint j = 0; j < p.cols(); ++j) {
@@ -20,9 +16,6 @@ void removeDoppler(Eigen::MatrixXd &p, Eigen::Vector3d vbar, double beta) {
         double delta_r = beta * (vbar(0) * cos(phi) + vbar(1) * sin(phi));
         p(0, j) += delta_r * cos(phi);
         p(1, j) += delta_r * sin(phi);
-        // double rsq = p(0, j) * p(0, j) + p(1, j) * p(1, j);
-        // p(0, j) += beta * v * p(0, j) * p(0, j) / rsq;
-        // p(1, j) += beta * v * p(0, j) * p(1, j) / rsq;
     }
 }
 
@@ -47,45 +40,11 @@ Eigen::MatrixXd computeAndGetTransform(Eigen::MatrixXd p2, Eigen::MatrixXd p1, d
     return T;
 }
 
-// ICP
-Eigen::MatrixXd computeAndGetTransform2(Eigen::MatrixXd p2, Eigen::MatrixXd p1, double ransac_threshold,
-    double inlier_ratio, int max_iterations) {
-    Eigen::MatrixXd c1 = Eigen::MatrixXd::Ones(3, p1.cols());
-    Eigen::MatrixXd c2 = Eigen::MatrixXd::Ones(3, p2.cols());
-    c1.block(0, 0, 2, p1.cols()) = p1.block(0, 0, 2, p1.cols());
-    c2.block(0, 0, 2, p2.cols()) = p2.block(0, 0, 2, p1.cols());
-    DP::Labels labels;
-    labels.push_back(DP::Label("x", 1));
-    labels.push_back(DP::Label("y", 1));
-    labels.push_back(DP::Label("w", 1));
-    DP ref(c1, labels);
-    DP data(c2, labels);
-    PM::ICP icp;
-    std::string config = "/home/keenan/radar_ws/src/yeti/yeti/config/icp.yaml";
-    std::ifstream ifs(config.c_str());
-    icp.loadFromYaml(ifs);
-    icp.readingDataPointsFilters = icp.referenceDataPointsFilters;
-    // icp.setDefault();
-    Eigen::Matrix3d prior = Eigen::Matrix3d::Identity();
-    prior.block(0, 0, 2, 2) << -1, 0, 0, -1;
-    std::cout << prior << std::endl;
-    PM::TransformationParameters T = icp(data, ref, prior);
-    Eigen::MatrixXd Tout = T;
-
-    DP data_out(data);
-    icp.transformations.apply(data_out, T);
-    ref.save("test_ref.vtk");
-    data.save("test_data_in.vtk");
-    data_out.save("test_data_out.vtk");
-
-    return Tout;
-}
-
+// Assuming rotations are SO(2), this function returns the angle (yaw/heading) corresponding to the rotation
 double getRotation(Eigen::MatrixXd T) {
     Eigen::MatrixXd Cmin = T.block(0, 0, 2, 2);
     Eigen::MatrixXd C = Eigen::MatrixXd::Identity(3, 3);
     C.block(0, 0, 2, 2) = Cmin;
-
     double eps = 1e-15;
     int i = 2, j = 1, k = 0;
     double c_y = sqrt(pow(C(i, i), 2) + pow(C(j, i), 2));
@@ -95,28 +54,13 @@ double getRotation(Eigen::MatrixXd T) {
     } else {
         phi = atan2f(-C(j, k), C(j, j));
     }
-
-    // double trace = 0;
-    // for (int i = 0; i < C.rows(); ++i) {
-    //     trace += C(i, i);
-    // }
-    // double phi = acos((trace - 1) / 2);
-    //
-    // if (T(0, 1) > 0)
-    //     phi *= -1;
-
     return phi;
 }
 
 int main(int argc, char *argv[]) {
-    // std::string root = "/home/keenan/Documents/data/boreas/2020_10_06";
     std::string root = "/media/backup2/2020_11_26";
-    // omp_set_num_threads(8);
     std::string datadir = root + "/radar";
-    // std::string gt = root + "/radar_groundtruth_icra2.csv";
     std::string gt = root + "/applanix/radar_loc_gt.csv";
-
-    // YAML::Node node = YAML::LoadFile("/home/keenan/radar_ws/src/yeti/yeti/config/feature_matching.yaml");
 
     bool interp = true;
     float zq = 3.0;
@@ -139,7 +83,7 @@ int main(int argc, char *argv[]) {
     // File for storing the results of estimation on each frame (and the accuracy)
     std::ofstream ofs;
     ofs.open("localization_accuracy.csv", std::ios::out);
-    // ofs << "x,y,yaw,gtx,gty,gtyaw,time1,time2,xmd,ymd,yawmd,xdopp,ydopp,yawdopp,v1,w1,v2,w2,\n";
+
     // Create ORB feature detector
     cv::Ptr<cv::ORB> detector = cv::ORB::create();
     detector->setPatchSize(patch_size);

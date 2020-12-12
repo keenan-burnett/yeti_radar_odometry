@@ -1,13 +1,7 @@
 project(yeti)
 cmake_minimum_required(VERSION 3.1)
 set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -W -Wno-unused-parameter -O2")
-
-add_definitions(-DSTEAM_DEFAULT_NUM_OPENMP_THREADS=8)
-
-find_package(catkin REQUIRED COMPONENTS
-	steam
-)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -W -Wno-unused-parameter -O2 -LAH")
 
 find_package(OpenMP REQUIRED)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
@@ -15,13 +9,12 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
 set(OMP_NUM_THREADS 8)
 
 find_package(OpenCV 3 REQUIRED)
+find_package(Eigen3 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS
     system
     filesystem
 )
 find_package(PkgConfig)
-
-find_package(libpointmatcher REQUIRED)
 
 find_package(PythonLibs REQUIRED)
 
@@ -32,8 +25,13 @@ include_directories(
 	${catkin_INCLUDE_DIRS}
 	${OpenCV_INCLUDE_DIRS}
 	${Boost_INCLUDE_DIRS}
-    ${libpointmatcher_INCLUDE_DIRS}
+    ${EIGEN_INCLUDE_DIR}
 )
+
+get_property(dirs DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES)
+foreach(dir ${dirs})
+  message(STATUS "dir='${dir}'")
+endforeach()
 
 add_library(features
   src/features.cpp
@@ -43,6 +41,7 @@ target_link_libraries(features
 	${catkin_LIBRARIES}
 	${OpenCV_LIBRARIES}
 	${Boost_INCLUDE_DIRS}
+    Eigen3::Eigen
 )
 
 add_library(radar_utils
@@ -53,6 +52,7 @@ target_link_libraries(radar_utils
 	${catkin_LIBRARIES}
 	${OpenCV_LIBRARIES}
 	${Boost_INCLUDE_DIRS}
+    Eigen3::Eigen
 )
 
 add_library(association
@@ -62,6 +62,7 @@ add_library(association
 target_link_libraries(association
 	${catkin_LIBRARIES}
 	${Boost_INCLUDE_DIRS}
+    Eigen3::Eigen
 )
 
 add_executable(visualization src/visualization.cpp)
@@ -73,28 +74,10 @@ target_link_libraries(visualization
 	${Boost_INCLUDE_DIRS}
 )
 
-add_executable(scan_matching_basic src/scan_matching_basic.cpp)
-target_link_libraries(scan_matching_basic
-    features
-    radar_utils
-	${catkin_LIBRARIES}
-	${OpenCV_LIBRARIES}
-    ${libpointmatcher_LIBRARIES}
-)
-
-add_executable(scan_matching_test src/test_scan_matching.cpp)
-target_link_libraries(scan_matching_test
-    features
-    radar_utils
-	${catkin_LIBRARIES}
-	${OpenCV_LIBRARIES}
-    ${libpointmatcher_LIBRARIES}
-)
-
 find_library(yaml-cpp REQUIRED)
 
-add_executable(test_feature_matching src/test_feature_matching.cpp)
-target_link_libraries(test_feature_matching
+add_executable(odometry src/odometry.cpp)
+target_link_libraries(odometry
     features
     radar_utils
     association
@@ -117,17 +100,6 @@ target_link_libraries(test_motiondistortion
 )
 target_compile_definitions(test_motiondistortion PRIVATE "-DWITHOUT_NUMPY")
 
-add_executable(test_doppler_distortion src/test_doppler_distortion.cpp)
-target_link_libraries(test_doppler_distortion
-    features
-    radar_utils
-    association
-	${catkin_LIBRARIES}
-	${OpenCV_LIBRARIES}
-	matplotlibcpp
-)
-target_compile_definitions(test_doppler_distortion PRIVATE "-DWITHOUT_NUMPY")
-
 add_executable(showcase_distortion src/showcase_distortion.cpp)
 target_link_libraries(showcase_distortion
     features
@@ -139,13 +111,11 @@ target_link_libraries(showcase_distortion
 )
 target_compile_definitions(showcase_distortion PRIVATE "-DWITHOUT_NUMPY")
 
-add_executable(test_localization src/test_localization.cpp)
-target_link_libraries(test_localization
+add_executable(localization src/localization.cpp)
+target_link_libraries(localization
     features
     radar_utils
     association
 	${catkin_LIBRARIES}
 	${OpenCV_LIBRARIES}
-    ${libpointmatcher_LIBRARIES}
-    # yaml-cpp
 )
