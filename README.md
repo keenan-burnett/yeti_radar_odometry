@@ -68,7 +68,11 @@ Example usage:
 ./build/yeti/odometry <sequence_name>
 ```
 
-`localization.cpp` This program peforms metric localization between radar scans collected in opposite directions. This example relies data taken from our own platform, Boreas. Dowload some example data for this using this script (54 GB):
+`localization.cpp` This program peforms metric localization between radar scans collected in opposite directions. This example relies data taken from our own platform, Boreas.
+
+In order to access our S3 bucket, you'll need to fill out this [google form](https://forms.gle/ZGtQhKRXkxmcAGih9) and wait a few days for our response:
+
+Dowload some example data for this using this script (54 GB):
 
 ```
 scripts/download_data.sh
