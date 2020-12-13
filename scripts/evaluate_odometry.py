@@ -165,10 +165,6 @@ def getStats(err):
     return t_err, r_err
 
 if __name__ == '__main__':
-    # afile = 'accuracy.csv'
-    # if len(sys.argv) > 1:
-    #     afile = sys.argv[1]
-    # print(afile)
 
     # dontinclude = ['accuracy2019-01-10-14-36-48-radar-oxford-10k-partial',
     #     'accuracy2019-01-10-11-46-21-radar-oxford-10k',

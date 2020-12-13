@@ -23,25 +23,10 @@ int main() {
     std::vector<bool> valid;
     cv::Mat fft_data;
 
-    // for (uint i = 0; i < 100; ++i) {
-    //     load_radar(datadir + "/" + radar_files[i], timestamps, azimuths, valid, fft_data);
-    //     cv::Mat cart_img;
-    //     radar_polar_to_cartesian(azimuths, fft_data, radar_resolution, cart_resolution, cart_pixel_width,
-    //         interpolate_crossover, cart_img);
-    //     cart_img.convertTo(cart_img, CV_8UC1, 255.0);
-    //     cv::flip(cart_img, cart_img, 1);
-    //     cv::imwrite(radar_files[i], cart_img);
-    // }
-
     load_radar(datadir + "/" + radar_files[0], timestamps, azimuths, valid, fft_data);
 
     Eigen::MatrixXd targets;
     int min_range = 58;
-
-    // int window_size = 128;
-    // float scale = 3.5;
-    // int guard_cells = 32;
-    // cfar1d(fft_data, window_size, scale, guard_cells, min_range, targets);
 
     // int max_points = 10000;
     // cen2019features(fft_data, max_points, min_range, targets);
