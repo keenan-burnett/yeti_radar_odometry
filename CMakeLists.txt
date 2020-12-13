@@ -73,8 +73,6 @@ target_link_libraries(visualization
 	${Boost_INCLUDE_DIRS}
 )
 
-find_library(yaml-cpp REQUIRED)
-
 add_executable(odometry src/odometry.cpp)
 target_link_libraries(odometry
     features
@@ -82,7 +80,6 @@ target_link_libraries(odometry
     association
 	${catkin_LIBRARIES}
 	${OpenCV_LIBRARIES}
-    yaml-cpp
 )
 
 add_library(matplotlibcpp INTERFACE)

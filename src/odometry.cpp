@@ -1,4 +1,3 @@
-#include <yaml-cpp/yaml.h>
 #include <iostream>
 #include <string>
 #include <fstream>
@@ -13,7 +12,6 @@
 
 int main(int argc, char *argv[]) {
     std::string root = "/home/keenan/Documents/data/";
-    // std::string root = "/workspace/raid/krb/oxford-radar-robotcar-dataset/";
     std::string sequence = "2019-01-10-14-36-48-radar-oxford-10k-partial";
     if (argc > 1)
         sequence = argv[1];
@@ -25,26 +23,30 @@ int main(int argc, char *argv[]) {
     omp_set_num_threads(8);
     std::string datadir = root + sequence + "/radar";
     std::string gt = root + sequence + "/gt/radar_odometry.csv";
-    YAML::Node node = YAML::LoadFile("/home/keenan/radar_ws/src/yeti/yeti/config/feature_matching.yaml");
-    // YAML::Node node = YAML::LoadFile("/workspace/Documents/catkin_ws/src/yeti/yeti/config/feature_matching.yaml");
 
-    float cart_resolution = node["cart_resolution"].as<float>();
-    int cart_pixel_width = node["cart_pixel_width"].as<int>();
-    int min_range = node["min_range"].as<int>();
-    float radar_resolution = node["radar_resolution"].as<float>();
-    bool interp = node["interp"].as<bool>();
-    float zq = node["zq"].as<float>();
-    int max_points = node["max_points"].as<int>();
-    int sigma_gauss = node["sigma_gauss"].as<int>();
-    int patch_size = node["patch_size"].as<int>();
-    float nndr = node["nndr"].as<float>();
-    double ransac_threshold = node["threshold"].as<double>();
-    double inlier_ratio = node["inlier_ratio"].as<double>();
-    int max_iterations = node["max_iterations"].as<int>();
-    int max_gn_iterations = node["max_gn_iterations"].as<int>();
-    double md_threshold = node["md_threshold"].as<double>();
-    int keypoint_extraction = node["keypoint_extraction"].as<int>();
-    double beta = node["beta"].as<double>();
+    int min_range = 58;                 // min range of radar points (bin)
+    float radar_resolution = 0.0432;    // resolution of radar bins in meters per bin
+    float cart_resolution = 0.2592;     // meters per pixel
+    int cart_pixel_width = 964;         // height and width of cartesian image in pixels
+    bool interp = true;
+    int keypoint_extraction = 0;        // 0: cen2018, 1: cen2019, 2: orb
+    // cen2018 parameters
+    float zq = 3.0;
+    int sigma_gauss = 17;
+    // cen2019 parameters
+    int max_points = 10000;
+    // ORB descriptor / matching parameters
+    int patch_size = 21;                // width of patch in pixels in cartesian radar image
+    float nndr = 0.80;                  // Nearest neighbor distance ratio
+    // RANSAC
+    double ransac_threshold = 0.35;
+    double inlier_ratio = 0.90;
+    int max_iterations = 100;
+    // MDRANSAC
+    int max_gn_iterations = 10;
+    double md_threshold = pow(ransac_threshold, 2);
+    // DOPPLER
+    double beta = 0.049;
 
     // Get file names of the radar images
     std::vector<std::string> radar_files;
@@ -139,10 +141,6 @@ int main(int argc, char *argv[]) {
         Eigen::MatrixXd T;  // T_1_2
         ransac.getTransform(T);
 
-        std::vector<int> inliers;
-        ransac.getInliers(T, inliers);
-        std::cout << "rigid inliers: " << inliers.size() << std::endl;
-
         // Compute the transformation using motion-distorted RANSAC
         MotionDistortedRansac mdransac(p2, p1, t2prime, t1prime, md_threshold, inlier_ratio, max_iterations);
         mdransac.setMaxGNIterations(max_gn_iterations);
@@ -155,9 +153,6 @@ int main(int argc, char *argv[]) {
 
         Eigen::VectorXd wbar;
         mdransac.getMotion(wbar);
-        inliers.clear();
-        mdransac.getInliers(wbar, inliers);
-        std::cout << "mdransac inliers: " << inliers.size() << std::endl;
 
         // MDRANSAC + Doppler
         mdransac.correctForDoppler(true);

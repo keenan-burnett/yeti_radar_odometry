@@ -11,8 +11,7 @@ def getRotDiff(r1, r2):
     return abs(yaw_err)
 
 if __name__ == "__main__":
-    # file = "localization_accuracy_icra3.csv"
-    file = "localization_accuracy_2020_11_26.csv"
+    file = "localization_accuracy_icra4.csv"
 
     dt1 = []
     dt2 = []

@@ -28,10 +28,9 @@ If you found this git repository useful in your work, please consider citing our
 Dependencies:
 
 ```
-Eigen 3
+Eigen 3.3
 Boost 1.5.8
-OpenCV 3
-yaml-cpp
+OpenCV 3.3
 ```
 
 Note: I have only tested that this code compiles on Ubuntu 16.04, but it should compile for newer versions of Ubuntu.
@@ -39,13 +38,6 @@ Note: I have only tested that this code compiles on Ubuntu 16.04, but it should 
 Note: we provide a Dockerfile which can be used to build a docker image with all the required deps already installed.
 
 These build instructions assume you are building your project using a catkin workspace with catkin build.
-
-Installing yaml-cpp:
-
-```
-git clone https://github.com/jbeder/yaml-cpp.git
-cd yaml-cpp && mkdir build && cd build && cmake .. && make && sudo make install
-```
 
 Building yeti:
 
