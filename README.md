@@ -10,12 +10,12 @@ This repo contains radar odometry code which removes motion distortion and Doppl
 
 If you found this git repository useful in your work, please consider citing our paper which has been submitted to ICRA/RA-L 2021:
 
-[Do We Need to Compensate for Motion Distortion and Doppler Effects in Radar-Based Navigation?](https://arxiv.org/abs/2011.03512)
+[Do We Need to Compensate for Motion Distortion and Doppler Effects in Spinning Radar Navigation?](https://arxiv.org/abs/2011.03512)
 
 ```
 @article{burnett_icra21,
     author = {Keenan Burnett, Angela P. Schoellig, Timothy D. Barfoot},
-    title = {Do We Need to Compensate for Motion Distortion and Doppler Effects in Radar-Based Navigation?},
+    title = {Do We Need to Compensate for Motion Distortion and Doppler Effects in Spinning Radar Navigation?},
     year={2020},
     eprint={2011.03512},
     archivePrefix={arXiv},
