@@ -22,6 +22,7 @@ If you found this git repository useful in your work, please consider citing our
   number={2},
   pages={771-778},
   doi={10.1109/LRA.2021.3052439}}
+}
 ```
 
 ## Build Instructions
