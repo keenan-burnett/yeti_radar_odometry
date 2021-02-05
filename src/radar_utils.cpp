@@ -440,3 +440,40 @@ void getTimes(Eigen::MatrixXd cart_targets, std::vector<double> azimuths, std::v
         }
     }
 }
+
+static void usage(const char *argv[]) {
+    std::cerr << std::endl << std::endl;
+    std::cerr << "USAGE:" << std::endl;
+    std::cerr << "  " << argv[0] << " --root ROOT_DIRECTORY --sequence SEQUENCE --append APPEND_EXT" << std::endl;
+    std::cerr << std::endl;
+    std::cerr << "--root ROOT_DIRECTORY  Absolute path to data, ex: /home/keenan/Documents/data/" << std::endl;
+    std::cerr << "--sequence SEQUENCE  Name of Oxford Sequence, ex: 2019-01-10-11-46-21-radar-oxford-10k" << std::endl;
+    std::cerr << "--append APPEND_EXT   accuracy<APPEND_EXT>.csv output file name for odometry" << std::endl;
+    std::cerr << std::endl;
+}
+
+int validateArgs(const int argc, const char *argv[], std::string &root) {
+    std::string seq, app;
+    return validateArgs(argc, argv, root, seq, app);
+}
+
+int validateArgs(const int argc, const char *argv[], std::string &root, std::string &seq, std::string &app) {
+    if (argc <= 2) {
+        std::cerr << "Not enough arguments, usage:";
+        usage(argv);
+        return 1;
+    }
+    for (int i = 1; i <= argc - 2; i += 2) {
+        const std::string opt(argv[i]);
+        if (opt == "--root") {
+            root = argv[i + 1];
+        } else if (opt == "--sequence") {
+            seq = argv[i + 1];
+        } else if (opt == "--append") {
+            app = argv[i + 1];
+        } else {
+            std::cerr << "Unknown option " << opt << ", usage:"; usage(argv); exit(1);
+        }
+    }
+    return 0;
+}

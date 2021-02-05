@@ -10,14 +10,9 @@
 #include "features.hpp"
 #include "association.hpp"
 
-int main(int argc, char *argv[]) {
-    std::string root = "/home/keenan/Documents/data/";
-    std::string sequence = "2019-01-10-14-36-48-radar-oxford-10k-partial";
-    if (argc > 1)
-        sequence = argv[1];
-    std::string append = "";
-    if (argc > 2)
-        append = argv[2];
+int main(int argc, const char *argv[]) {
+    std::string root, sequence, append;
+    validateArgs(argc, argv, root, sequence, append);
     std::cout << sequence << std::endl;
     std::cout << append << std::endl;
     omp_set_num_threads(8);

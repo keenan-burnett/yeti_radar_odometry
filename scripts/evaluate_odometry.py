@@ -46,6 +46,7 @@ def calcSequenceErrors(poses_gt, poses_res):
     step_size = 4 # Every second
     # Pre-compute distances from ground truth as reference
     dist = trajectoryDistances(poses_gt)
+    print(dist[-1])
 
     for first_frame in range(0, len(poses_gt), step_size):
         for i in range(0, len(lengths)):
@@ -64,6 +65,15 @@ def calcSequenceErrors(poses_gt, poses_res):
             speed = float(length) / (0.25 * num_frames)
             err.append([first_frame, r_err/float(length), t_err/float(length), length, speed])
     return err
+
+def calcAbsoluteTrajectoryError(poses_gt, poses_res):
+    error = 0
+    for T_gt, T_res in zip(poses_gt, poses_res):
+        T_err = np.matmul(get_inverse_tf(T_res), T_gt)
+        t_err = T_err[0:2, 2].reshape(2, 1)
+        error += (np.linalg.norm(t_err) ** 2)
+    error /= len(poses_gt)
+    return np.sqrt(error)
 
 def saveSequenceErrors(err, file_name):
     with open(file_name, "w") as f:
@@ -166,30 +176,34 @@ def getStats(err):
 
 if __name__ == '__main__':
 
-    # dontinclude = ['accuracy2019-01-10-14-36-48-radar-oxford-10k-partial',
-    #     'accuracy2019-01-10-11-46-21-radar-oxford-10k',
-    #     'accuracy2019-01-16-14-15-33-radar-oxford-10k']
+    dontinclude = ['accuracy2019-01-10-14-36-48-radar-oxford-10k-partial',
+        'accuracy2019-01-10-11-46-21-radar-oxford-10k',
+        'accuracy2019-01-16-14-15-33-radar-oxford-10k']
 
-    # folder = './icra_odom/'
-    # ff = os.listdir('./icra_odom/')
-    # files = []
-    # for f in ff:
-    #     if 'accuracy' in f:
-    #         bad = False
-    #         for dont in dontinclude:
-    #             if dont in f:
-    #                 bad = True
-    #         if not bad:
-    #             files.append(folder + f)
+    folder = './icra_odom/'
+    ff = os.listdir('./icra_odom/')
+    files = []
+    for f in ff:
+        if 'accuracy' in f:
+            bad = False
+            for dont in dontinclude:
+                if dont in f:
+                    bad = True
+            if not bad:
+                files.append(folder + f)
 
-    files = ['accuracy.csv']
+    # files = ['accuracy.csv']
 
     err_rigid = []
     err_md = []
     err_dopp = []
 
+    ate_rigid = []
+    ate_md = []
+    ate_dopp = []
+
     for file in files:
-	print(file)
+	    print(file)
         T_gt = np.identity(3)
         T_res = np.identity(3)
         T_md = np.identity(3)
@@ -241,22 +255,34 @@ if __name__ == '__main__':
         err_md.extend(calcSequenceErrors(poses_gt, poses_md))
         err_dopp.extend(calcSequenceErrors(poses_gt, poses_dopp))
 
-    # saveSequenceErrors(err_rigid, 'pose_error_rigid.csv')
-    # saveSequenceErrors(err_md, 'pose_error_mdransac.csv')
-    # saveSequenceErrors(err_dopp, 'pose_error_dopp.csv')
+        ate_rigid.append(calcAbsoluteTrajectoryError(poses_gt, poses_res))
+        ate_md.append(calcAbsoluteTrajectoryError(poses_gt, poses_md))
+        ate_dopp.append(calcAbsoluteTrajectoryError(poses_gt, poses_dopp))
+
+    saveSequenceErrors(err_rigid, 'pose_error_rigid_icra3.csv')
+    saveSequenceErrors(err_md, 'pose_error_mdransac_icra3.csv')
+    saveSequenceErrors(err_dopp, 'pose_error_dopp_icra3.csv')
     # err_rigid = loadSequenceErrors('pose_error_rigid_icra2.csv')
     # err_md = loadSequenceErrors('pose_error_mdransac_icra2.csv')
     # err_dopp = loadSequenceErrors('pose_error_dopp_icra2.csv')
-    # saveErrorPlots([err_rigid, err_md, err_dopp], 'pose_error.pdf')
+    saveErrorPlots([err_rigid, err_md, err_dopp], 'pose_error.pdf')
+
+    ate_rigid = np.array(ate_rigid)
+    ate_md = np.array(ate_md)
+    ate_dopp = np.array(ate_dopp)
+
     t_err, r_err = getStats(err_rigid)
     print('RIGID:')
     print('t_err: {} %'.format(t_err * 100))
     print('r_err: {} deg/m'.format(r_err * 180 / np.pi))
+    print('ATE: {} m'.format(np.mean(ate_rigid)))
     t_err, r_err = getStats(err_md)
     print('MC-RANSAC:')
     print('t_err: {} %'.format(t_err * 100))
     print('r_err: {} deg/m'.format(r_err * 180 / np.pi))
+    print('ATE: {} m'.format(np.mean(ate_md)))
     t_err, r_err = getStats(err_dopp)
     print('DOPPLER:')
     print('t_err: {} %'.format(t_err * 100))
     print('r_err: {} deg/m'.format(r_err * 180 / np.pi))
+    print('ATE: {} m'.format(np.mean(ate_dopp)))

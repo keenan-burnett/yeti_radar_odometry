@@ -30,21 +30,23 @@ def enforce_orthogonality(R):
     R[0, 0] = a; R[0, 1] = b;
     R[1, 0] = -b; R[1, 1] = a;
 
+# def get_transform(x, y, theta):
+#     R = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
+#     if np.linalg.det(R) != 1.0:
+#         enforce_orthogonality(R)
+#     xbar = np.array([x, y])
+#     xbar = np.reshape(xbar, (2, 1))
+#     T = np.identity(3)
+#     T[0:2, 0:2] = R
+#     xbar = np.matmul(-R, xbar)
+#     T[0, 2] = xbar[0]
+#     T[1, 2] = xbar[1]
+#     return T
+
 def get_transform(x, y, theta):
-    R = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
+    R = np.array([[np.cos(theta), np.sin(theta)], [-np.sin(theta), np.cos(theta)]])
     if np.linalg.det(R) != 1.0:
         enforce_orthogonality(R)
-    xbar = np.array([x, y])
-    xbar = np.reshape(xbar, (2, 1))
-    T = np.identity(3)
-    T[0:2, 0:2] = R
-    xbar = np.matmul(-R, xbar)
-    T[0, 2] = xbar[0]
-    T[1, 2] = xbar[1]
-    return T
-
-def get_transform2(x, y, theta):
-    R = np.array([[np.cos(theta), np.sin(theta)], [-np.sin(theta), np.cos(theta)]])
     T = np.identity(3)
     T[0:2, 0:2] = R
     T[0, 2] = x
@@ -329,10 +331,10 @@ if __name__ == '__main__':
                 i = 1
                 continue
             # Create transformation matrices
-            T_gt_ = get_transform2(float(row[3]), float(row[4]), float(row[5]))
-            T_rigid_ = get_transform2(float(row[0]), float(row[1]), float(row[2]))
-            T_md_ = get_transform2(float(row[8]), float(row[9]), float(row[10]))
-            T_dopp_ = get_transform2(float(row[11]), float(row[12]), float(row[13]))
+            T_gt_ = get_transform(float(row[3]), float(row[4]), float(row[5]))
+            T_rigid_ = get_transform(float(row[0]), float(row[1]), float(row[2]))
+            T_md_ = get_transform(float(row[8]), float(row[9]), float(row[10]))
+            T_dopp_ = get_transform(float(row[11]), float(row[12]), float(row[13]))
             T_gt = np.matmul(T_gt, T_gt_)
             T_rigid = np.matmul(T_rigid, T_rigid_)
             T_md = np.matmul(T_md, T_md_)

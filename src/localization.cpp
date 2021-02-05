@@ -57,8 +57,9 @@ double getRotation(Eigen::MatrixXd T) {
     return phi;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, const char *argv[]) {
     std::string root = "/media/backup2/2020_11_26";
+    validateArgs(argc, argv, root);
     std::string datadir = root + "/radar";
     std::string gt = root + "/applanix/radar_loc_gt.csv";
 

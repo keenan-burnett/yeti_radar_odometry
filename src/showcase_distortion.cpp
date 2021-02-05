@@ -156,8 +156,9 @@ void undistort_radar_image(cv::Mat &input, cv::Mat &output, Eigen::VectorXd wbar
     cv::remap(input, output, orig_x, orig_y, cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
 }
 
-int main() {
+int main(int argc, const char *argv[]) {
     std::string root = "/media/backup2/2020_11_26";
+    validateArgs(argc, argv, root);
     std::string radar_gt_file = root + "/applanix/radar_poses.csv";
     std::string lidar_gt_file = root + "/applanix/lidar_poses.csv";
     std::vector<std::string> lidar_files;

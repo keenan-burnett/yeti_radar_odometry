@@ -117,3 +117,9 @@ void draw_matches(cv::Mat &img, std::vector<cv::KeyPoint> kp1, std::vector<cv::K
 
 void getTimes(Eigen::MatrixXd cart_targets, std::vector<double> azimuths, std::vector<int64_t> times,
     std::vector<int64_t> &tout);
+
+/*!
+   \brief Load arguments from the command line and check their validity.
+*/
+int validateArgs(const int argc, const char *argv[], std::string &root, std::string &seq, std::string &app);
+int validateArgs(const int argc, const char *argv[], std::string &root);
