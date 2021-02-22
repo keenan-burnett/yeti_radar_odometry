@@ -116,3 +116,10 @@ target_link_libraries(localization
 	${catkin_LIBRARIES}
 	${OpenCV_LIBRARIES}
 )
+
+add_executable(save_cartesians src/save_cartesians.cpp)
+target_link_libraries(save_cartesians
+    radar_utils
+	${catkin_LIBRARIES}
+	${OpenCV_LIBRARIES}
+)
