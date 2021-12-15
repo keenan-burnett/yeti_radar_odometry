@@ -2,7 +2,9 @@
 
 This repo contains radar odometry code which removes motion distortion and Doppler effects from Navtech radar data. For our odometry experiments, we use the [Oxford Radar Robotcar Dataset](https://oxford-robotics-institute.github.io/radar-robotcar-dataset/). For our metric localization experiments, we use data taken using our own platform, Boreas, shown below.
 
-**NEW: [HERO Radar Odometry](https://github.com/utiasASRL/hero_radar_odometry) Deep-learned features combined with classical state estimation back-end. To be presented at RSS2021.**
+## Updates:
+**(2021-06-01): [HERO Radar Odometry](https://github.com/utiasASRL/hero_radar_odometry): Deep-learned features combined with a classical state estimation back-end. (RSS2021)**
+**(2021-12-14): [Boreas: A Multi-Season Autonomous Driving Dataset](https://boreas.utias.utoronto.ca): We have made our dataset publicly available along with a development kit, [pyboreas](https://github.com/utiasASRL/pyboreas), and public leaderboards for odometry, localization, and object detection.**
 
 ## Boreas
 ![Boreas](figs/boreas.JPG "Boreas")
