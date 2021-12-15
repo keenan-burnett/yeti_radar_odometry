@@ -4,6 +4,7 @@ This repo contains radar odometry code which removes motion distortion and Doppl
 
 ## Updates:
 **(2021-06-01): [HERO Radar Odometry](https://github.com/utiasASRL/hero_radar_odometry): Deep-learned features combined with a classical state estimation back-end. (RSS2021)**
+
 **(2021-12-14): [Boreas: A Multi-Season Autonomous Driving Dataset](https://boreas.utias.utoronto.ca): We have made our dataset publicly available along with a development kit, [pyboreas](https://github.com/utiasASRL/pyboreas), and public leaderboards for odometry, localization, and object detection.**
 
 ## Boreas
